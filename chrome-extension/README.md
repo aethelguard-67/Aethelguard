@@ -1,0 +1,79 @@
+# Aethelguard Guard (Chrome)
+
+This Manifest V3 extension checks public HTTP(S) URLs against existing
+VirusTotal reports and scans completed downloads by SHA-256. It does not submit
+unknown URLs or upload downloaded file contents. URL query strings and
+fragments are removed before lookup, and localhost/private-network addresses
+are skipped.
+
+For download scans, a Windows native host reads completed files from the
+Windows Downloads folder, computes their SHA-256 locally, and moves files to
+`%LOCALAPPDATA%\Aethelguard\Quarantine` when at least one VirusTotal engine
+classifies the file as malicious. It verifies the hash again before moving and
+checks the copied file. The extension reports the score, malicious/suspicious
+engine counts, and a few detection names in a Chrome notification.
+
+Completed downloads also get a VirusTotal reputation lookup for the final
+download domain. Only the domain is sent for this check; the URL path and query
+string are not. A domain reputation is an additional signal, not proof that a
+file is safe or malicious, and does not change the existing file-hash
+quarantine rules. Unknown domain reports do not trigger automatic quarantine.
+
+Suspicious-only files are warned about but not automatically moved. If
+VirusTotal has no report, the file is left in Downloads and reported as
+unrated; this does not mean that the file is safe. A VirusTotal lookup sends
+the file hash to VirusTotal and sends the file name/hash to the Aethelguard
+server. File contents remain on the computer.
+
+## Configure and install locally
+
+1. Set `VIRUSTOTAL_API_KEY` in the Aethelguard app's `.env.local`, then start or
+   restart the Next.js app.
+2. Open `chrome://extensions`, enable **Developer mode**, and choose **Load
+   unpacked**. Select this `chrome-extension` folder. Copy the extension ID
+   shown on its card.
+3. From the project folder, open PowerShell and run:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\chrome-extension\Install-NativeHost.ps1
+   ```
+   Enter the extension ID when prompted. The installer builds a small
+   Windows-only native helper and registers it for the current Windows user;
+   administrator access is not required. Reload the extension in Chrome.
+4. Start the Aethelguard app on the same computer and leave it running. The
+   extension connects to `http://localhost:3000` and automatically gets the
+   app's public Supabase URL and publishable/anon key. It does not ask each user
+   to enter those values. The service-role key and VirusTotal key stay server-side.
+5. Open the extension popup and sign in once with an existing Supabase
+   email/password account that has a profile. The extension keeps the refresh
+   token in Chrome storage and refreshes its access token as needed; it does not
+   ask for the password again unless the session expires or is signed out.
+6. Grant the extension site access when Chrome asks. Its download and
+   notification permissions are used to process completed downloads and show
+   the result.
+7. To have protection resume when you turn on the PC, enable Google Chrome in
+   **Windows Settings → Apps → Startup** (or place a Chrome shortcut in the
+   Windows Startup folder). Chrome starts its installed extensions with the
+   browser. This starts after your Windows account signs in; Chrome extensions
+   cannot run before Windows sign-in. Configure the Aethelguard app itself to
+   start with Windows as well; otherwise the extension cannot connect until the
+   app is started manually. This localhost setup only supports Chrome on the
+   same computer as the app.
+
+URL reports show the number of VirusTotal scanners that flagged the URL as
+malicious or suspicious rather than a normalized score. On malicious or
+suspicious reports, the banner offers **Go back to safety**. Unknown URLs are
+labelled unrated. Private and local URLs are skipped.
+
+To remove the Windows helper, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\chrome-extension\Install-NativeHost.ps1 -Uninstall
+```
+
+Uninstalling removes the Chrome native-host registration and executable. It
+does not delete quarantined files.
+
+Quarantined files remain under `%LOCALAPPDATA%\Aethelguard\Quarantine` with
+`.aethelguard-quarantined` appended to their names. They are not automatically
+restored. Only restore a file if you have independently confirmed that it is
+safe.

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Aethelguard URL Guard</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <header class="brand">
+        <img src="icons/aethelguard.png" alt="Aethelguard logo">
+        <h1>Aethelguard URL Guard</h1>
+      </header>
+      <p class="intro">Check URL reputation while browsing and scan completed downloads.</p>
+      <p id="connectionStatus" class="status"></p>
+      <button id="connect" type="button" class="secondary">Connect to Aethelguard on this device</button>
+      <form id="login">
+        <label>
+          Email
+          <input id="email" type="email" autocomplete="username" required>
+        </label>
+        <label>
+          Password
+          <input id="password" type="password" autocomplete="current-password" required>
+        </label>
+        <button type="submit">Sign in</button>
+      </form>
+      <button id="signOut" type="button" class="secondary" hidden>Sign out</button>
+      <p id="message" role="status" aria-live="polite"></p>
+      <p class="privacy">Download checks hash files locally; only hashes are sent to VirusTotal. Confirmed malicious files are moved to Aethelguard quarantine. Unknown files are left in Downloads and are not uploaded.</p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Aethelguard URL Guard",
+  "version": "1.0.0",
+  "description": "Shows VirusTotal URL reputation while you browse.",
+  "icons": {
+    "16": "icons/aethelguard.png",
+    "32": "icons/aethelguard.png",
+    "48": "icons/aethelguard.png",
+    "128": "icons/aethelguard.png"
+  },
+  "permissions": ["storage", "webNavigation", "downloads", "notifications", "nativeMessaging"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Aethelguard URL Guard",
+    "default_icon": {
+      "16": "icons/aethelguard.png",
+      "32": "icons/aethelguard.png"
+    },
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

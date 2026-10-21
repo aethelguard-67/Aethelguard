@@ -1,0 +1,18 @@
+*{box-sizing:border-box}
+body{width:340px;margin:0;background:#0f172a;color:#e2e8f0;font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{padding:18px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand img{width:36px;height:36px;border-radius:8px}
+h1{margin:0;font-size:17px}
+.intro,.privacy{color:#94a3b8}
+.intro{margin:5px 0 14px}
+.status{margin:0 0 12px;color:#94a3b8}
+label{display:flex;flex-direction:column;gap:5px;margin:11px 0;font-weight:600}
+input{width:100%;border:1px solid #334155;border-radius:7px;padding:9px;background:#111c30;color:#e2e8f0;font:inherit}
+button{width:100%;border:0;border-radius:7px;padding:9px;background:#10b981;color:#052e2b;font:600 13px system-ui,sans-serif;cursor:pointer}
+button.secondary{margin-top:8px;border:1px solid #475569;background:#1e293b;color:#e2e8f0}
+hr{border:0;border-top:1px solid #334155;margin:16px 0}
+#message{min-height:18px;color:#fca5a5;overflow-wrap:anywhere}
+#message.success{color:#34d399}
+.privacy{font-size:11px;margin:9px 0 0}
+form[hidden],button[hidden]{display:none}
