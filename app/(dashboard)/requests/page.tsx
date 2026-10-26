@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import { Check, Clock3, RefreshCw, X } from "lucide-react"
+import { Check, Clock3, Download, RefreshCw, X } from "lucide-react"
+import { jsPDF } from "jspdf"
 import { AdminGate } from "@/components/admin-gate"
 import { Button } from "@/components/ui/button"
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"
@@ -18,6 +19,48 @@ type RequestRow = {
 
 type ProfileRow = { id: string; email: string; display_name: string }
 type IncidentRow = { id: string; file_name: string; sha256: string; blocked_at: string }
+
+function downloadRequestReport(request: RequestRow, profile?: ProfileRow, incident?: IncidentRow) {
+  const pdf = new jsPDF()
+  const margin = 18
+  const lineHeight = 7
+  const pageBottom = 280
+  const contentWidth = pdf.internal.pageSize.getWidth() - margin * 2
+  let y = 22
+
+  function addText(value: string, options?: { bold?: boolean; gap?: number }) {
+    pdf.setFont("helvetica", options?.bold ? "bold" : "normal")
+    const lines = pdf.splitTextToSize(value, contentWidth) as string[]
+    for (const line of lines) {
+      if (y > pageBottom) {
+        pdf.addPage()
+        y = 20
+      }
+      pdf.text(line, margin, y)
+      y += lineHeight
+    }
+    y += options?.gap ?? 2
+  }
+
+  pdf.setFontSize(18)
+  addText("Aethelguard User Issue Report", { bold: true, gap: 5 })
+  pdf.setFontSize(11)
+  addText(`Report generated: ${new Date().toLocaleString()}`)
+  addText(`Request ID: ${request.id}`)
+  addText(`Status: ${request.status}`)
+  addText(`User: ${profile?.display_name || profile?.email || request.user_id}`)
+  if (profile?.display_name && profile.email) addText(`Email: ${profile.email}`)
+  addText(`Submitted: ${new Date(request.requested_at).toLocaleString()}`)
+  if (request.reviewed_at) addText(`Reviewed: ${new Date(request.reviewed_at).toLocaleString()}`)
+  addText(`Affected file: ${incident?.file_name ?? "File name unavailable"}`)
+  addText(`SHA-256: ${incident?.sha256 ?? "Unavailable"}`)
+  addText(`Incident ID: ${request.incident_id}`)
+  if (incident?.blocked_at) addText(`Blocked: ${new Date(incident.blocked_at).toLocaleString()}`)
+  addText("Issue description submitted by user:", { bold: true, gap: 0 })
+  addText(request.reason)
+
+  pdf.save(`aethelguard-issue-report-${request.id.slice(0, 8)}.pdf`)
+}
 
 function RequestsContent() {
   const [requests, setRequests] = useState<RequestRow[]>([])
@@ -147,33 +190,48 @@ function RequestsContent() {
                     Blocked {new Date(incident.blocked_at).toLocaleString()}
                   </p>
                 )}
-                {pending && (
-                  <div className="mt-5 flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={busyId === request.id}
-                      onClick={() => void decide(request.id, "rejected")}
-                      className="gap-2"
-                    >
-                      {busyId === request.id ? <RefreshCw className="size-4 animate-spin" /> : <X className="size-4" />}
-                      Reject
-                    </Button>
-                    <Button
-                      size="sm"
-                      disabled={busyId === request.id}
-                      onClick={() => void decide(request.id, "approved")}
-                      className="gap-2"
-                    >
-                      {busyId === request.id ? (
-                        <RefreshCw className="size-4 animate-spin" />
-                      ) : (
-                        <Check className="size-4" />
-                      )}
-                      Approve & release
-                    </Button>
-                  </div>
-                )}
+                <div className="mt-5 flex flex-wrap justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => downloadRequestReport(request, profile, incident)}
+                    className="gap-2"
+                  >
+                    <Download className="size-4" />
+                    Download PDF report
+                  </Button>
+                  {pending && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={busyId === request.id}
+                        onClick={() => void decide(request.id, "rejected")}
+                        className="gap-2"
+                      >
+                        {busyId === request.id ? (
+                          <RefreshCw className="size-4 animate-spin" />
+                        ) : (
+                          <X className="size-4" />
+                        )}
+                        Reject
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={busyId === request.id}
+                        onClick={() => void decide(request.id, "approved")}
+                        className="gap-2"
+                      >
+                        {busyId === request.id ? (
+                          <RefreshCw className="size-4 animate-spin" />
+                        ) : (
+                          <Check className="size-4" />
+                        )}
+                        Approve & release
+                      </Button>
+                    </>
+                  )}
+                </div>
               </li>
             )
           })}

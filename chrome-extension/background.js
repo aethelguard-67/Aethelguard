@@ -3,6 +3,7 @@ const NATIVE_HOST = "com.aethelguard.file_guard"
 const reportCache = new Map()
 const pendingReports = new Map()
 const sourceReportCache = new Map()
+const notificationTimers = new Map()
 
 function normalizedPublicUrl(value) {
   let url
@@ -201,14 +202,32 @@ function sendNativeMessage(message) {
 }
 
 async function notifyDownload(downloadId, title, message) {
-  await chrome.notifications.create(`aethelguard-download-${downloadId}`, {
+  const notificationId = `aethelguard-download-${downloadId}`
+  await chrome.notifications.create(notificationId, {
     type: "basic",
     iconUrl: chrome.runtime.getURL("icons/aethelguard.png"),
     title,
     message: message.slice(0, 240),
     priority: 2,
   })
+
+  const existingTimer = notificationTimers.get(notificationId)
+  if (existingTimer) clearTimeout(existingTimer)
+  notificationTimers.set(
+    notificationId,
+    setTimeout(() => {
+      notificationTimers.delete(notificationId)
+      void chrome.notifications.clear(notificationId)
+    }, 6_000),
+  )
 }
+
+chrome.notifications.onClosed.addListener((notificationId) => {
+  const timer = notificationTimers.get(notificationId)
+  if (!timer) return
+  clearTimeout(timer)
+  notificationTimers.delete(notificationId)
+})
 
 async function requestFileScan(config, session, file, recordIncident) {
   const endpoint = new URL("/api/extension/scan", config.apiBaseUrl)

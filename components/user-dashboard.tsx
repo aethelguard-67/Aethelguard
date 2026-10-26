@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
-import { AlertTriangle, CalendarClock, CheckCircle2, Clock3, FileWarning, LoaderCircle, ShieldAlert } from "lucide-react"
+import { AlertTriangle, CalendarClock, CheckCircle2, Clock3, FileWarning, LoaderCircle, ShieldAlert, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { StatCard } from "@/components/stat-card"
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"
@@ -115,11 +115,18 @@ export function UserDashboard({ userId }: { userId: string }) {
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">My Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          See files quarantined by Aethelguard and track your requests to restore them.
-        </p>
+      <div className="relative overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/10 via-card to-card px-6 py-7 shadow-sm md:px-8 md:py-8">
+        <div className="relative z-10">
+          <span className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/70 px-3 py-1 text-xs font-medium text-primary">
+            <ShieldCheck className="size-3.5" />
+            Personal security
+          </span>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">My Dashboard</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+            See files quarantined by Aethelguard and track your requests to restore them.
+          </p>
+        </div>
+        <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-24 size-64 rounded-full bg-primary/10 blur-3xl" />
       </div>
 
       {error && <ErrorNotice message={error} />}
@@ -129,7 +136,7 @@ export function UserDashboard({ userId }: { userId: string }) {
         <StatCard label="Pending Requests" value={String(pendingCount)} icon={Clock3} tone="sky" hint="Awaiting administrator review" />
       </div>
 
-      <section className="rounded-xl border border-border bg-card">
+      <section className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-4">
           <CalendarClock className="size-4 text-primary" />
           <h2 className="text-sm font-semibold text-foreground">Recently Quarantined Files</h2>

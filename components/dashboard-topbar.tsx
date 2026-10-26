@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { LogOut, UserCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { createSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 
 export function DashboardTopbar() {
@@ -85,6 +86,7 @@ export function DashboardTopbar() {
 
       <div className="flex items-center gap-3">
         {error && <p role="alert" className="text-xs text-destructive">Account action failed: {error}</p>}
+        <ThemeToggle />
         <Button
           variant="outline"
           size="sm"
