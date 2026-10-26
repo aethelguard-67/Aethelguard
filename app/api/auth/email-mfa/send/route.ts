@@ -61,9 +61,11 @@ export async function POST(request: Request) {
 
   let token: string
   let code: string
+  let codeHash: string
   try {
     token = createEmailMfaChallengeToken()
     code = createEmailMfaCode()
+    codeHash = hashEmailMfaCode(token, code)
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : "Email verification is not configured."
     return NextResponse.json({ error: message }, { status: 503 })
@@ -73,7 +75,7 @@ export async function POST(request: Request) {
     p_session_id: sessionId,
     p_user_id: auth.user.id,
     p_challenge_hash: hashEmailMfaChallengeToken(token),
-    p_code_hash: hashEmailMfaCode(token, code),
+    p_code_hash: codeHash,
   })
   if (issueError) {
     return NextResponse.json({ error: `Unable to create the email challenge: ${issueError.message}` }, { status: 500 })

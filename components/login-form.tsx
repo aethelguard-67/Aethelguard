@@ -7,6 +7,19 @@ import { KeyRound, Loader2, LockKeyhole, Mail, ShieldCheck, UserRoundPlus } from
 import { Button } from "@/components/ui/button"
 import { createSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 
+async function readApiResponse(response: Response) {
+  const body = await response.text()
+  try {
+    return JSON.parse(body) as { error?: string; email?: string; required?: boolean }
+  } catch {
+    throw new Error(
+      body.trim()
+        ? `The server returned an invalid response (HTTP ${response.status}).`
+        : `The server returned an empty response (HTTP ${response.status}). Check the Vercel function logs.`,
+    )
+  }
+}
+
 export function LoginForm() {
   const router = useRouter()
   const [email, setEmail] = useState("")
@@ -25,7 +38,7 @@ export function LoginForm() {
       method: "POST",
       headers: { Authorization: `Bearer ${accessToken}` },
     })
-    const result = (await response.json()) as { error?: string; email?: string; required?: boolean }
+    const result = await readApiResponse(response)
     if (!response.ok) throw new Error(result.error ?? "Unable to send the email verification code.")
     if (!result.required) return false
     setEmail(result.email ?? email)
@@ -140,7 +153,7 @@ export function LoginForm() {
         },
         body: JSON.stringify({ code }),
       })
-      const result = (await response.json()) as { error?: string }
+      const result = await readApiResponse(response)
       if (!response.ok) throw new Error(result.error ?? "Unable to verify the email code.")
       router.replace("/dashboard")
     } catch (cause) {
