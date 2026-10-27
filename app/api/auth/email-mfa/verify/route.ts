@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Verification expired. Request a new email code." }, { status: 400 })
   }
 
-  let body: { code?: unknown }
+  let body: { code?: unknown; purpose?: unknown }
   try {
     body = await request.json()
   } catch {
@@ -22,8 +22,12 @@ export async function POST(request: NextRequest) {
   }
 
   const code = typeof body.code === "string" ? body.code : ""
+  const purpose = body.purpose
   if (!/^\d{6}$/.test(code)) {
     return NextResponse.json({ error: "Enter the six-digit email code." }, { status: 400 })
+  }
+  if (purpose !== undefined && purpose !== "auto-quarantine") {
+    return NextResponse.json({ error: "This verification request has an invalid purpose." }, { status: 400 })
   }
 
   const { data: claimsData, error: claimsError } = await auth.supabase.auth.getClaims(auth.accessToken)
@@ -48,8 +52,12 @@ export async function POST(request: NextRequest) {
   if (profileError) {
     return NextResponse.json({ error: `Unable to load the account profile: ${profileError.message}` }, { status: 500 })
   }
-  if (profile.role !== "admin") {
-    return NextResponse.json({ error: "Email verification codes are only required for administrator accounts." }, { status: 403 })
+  const isAutoQuarantineRequest = purpose === "auto-quarantine"
+  if (isAutoQuarantineRequest ? profile.role !== "user" : profile.role !== "admin") {
+    return NextResponse.json(
+      { error: isAutoQuarantineRequest ? "This setting can only be changed by a user account." : "This verification code is only valid for an administrator account." },
+      { status: 403 },
+    )
   }
 
   let codeHash: string
@@ -74,6 +82,22 @@ export async function POST(request: NextRequest) {
   }
   if (!verified) {
     return NextResponse.json({ error: "The code is invalid, expired, or has reached its attempt limit." }, { status: 400 })
+  }
+
+  if (isAutoQuarantineRequest) {
+    const { error: updateError } = await service
+      .from("profiles")
+      .update({ auto_quarantine_enabled: false })
+      .eq("id", auth.user.id)
+      .eq("role", "user")
+      .select("id")
+      .single()
+    if (updateError) {
+      return NextResponse.json(
+        { error: `The code was verified, but auto-quarantine could not be disabled: ${updateError.message}` },
+        { status: 500 },
+      )
+    }
   }
 
   const response = NextResponse.json({ verified: true })

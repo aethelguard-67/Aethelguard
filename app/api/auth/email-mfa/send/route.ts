@@ -13,6 +13,7 @@ type JwtClaims = { session_id?: unknown }
 export async function POST(request: Request) {
   const auth = await authenticateExtension(request)
   if ("response" in auth) return auth.response
+  const purpose = new URL(request.url).searchParams.get("purpose")
 
   const { data: claimsData, error: claimsError } = await auth.supabase.auth.getClaims(auth.accessToken)
   if (claimsError || !claimsData?.claims) {
@@ -44,7 +45,9 @@ export async function POST(request: Request) {
   }
 
   if (profile.role === "user") {
-    return NextResponse.json({ required: false })
+    if (purpose !== "auto-quarantine") return NextResponse.json({ required: false })
+  } else if (purpose !== null) {
+    return NextResponse.json({ error: "This verification request has an invalid purpose." }, { status: 400 })
   }
 
   const resendApiKey = process.env.RESEND_API_KEY

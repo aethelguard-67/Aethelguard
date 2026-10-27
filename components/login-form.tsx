@@ -33,6 +33,10 @@ export function LoginForm() {
   const [notice, setNotice] = useState<string | null>(null)
   const [confirmationPending, setConfirmationPending] = useState(false)
 
+  function getLoginDestination() {
+    return new URLSearchParams(window.location.search).get("next") === "/settings" ? "/settings" : "/dashboard"
+  }
+
   async function sendEmailCode(accessToken: string) {
     const response = await fetch("/api/auth/email-mfa/send", {
       method: "POST",
@@ -66,7 +70,7 @@ export function LoginForm() {
 
       setPassword("")
       const requiresEmailCode = await sendEmailCode(data.session.access_token)
-      if (!requiresEmailCode) router.replace("/dashboard")
+      if (!requiresEmailCode) router.replace(getLoginDestination())
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Unable to sign in."
       const { error: signOutError } = await supabase.auth.signOut()
@@ -95,7 +99,7 @@ export function LoginForm() {
 
       setPassword("")
       if (data.session) {
-        router.replace("/dashboard")
+        router.replace(getLoginDestination())
       } else {
         setConfirmationPending(true)
         setNotice("If this email can be registered, Supabase will send a confirmation link. Confirm your email before signing in.")
@@ -172,7 +176,7 @@ export function LoginForm() {
       const accessToken = sessionResult.data.session?.access_token
       if (!accessToken) throw new Error("Your password session expired. Sign in again.")
       const requiresEmailCode = await sendEmailCode(accessToken)
-      if (!requiresEmailCode) router.replace("/dashboard")
+      if (!requiresEmailCode) router.replace(getLoginDestination())
       setCode("")
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to resend the email code.")

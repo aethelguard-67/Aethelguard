@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { AlertTriangle, CheckCircle2, Loader2, Mail, LockKeyhole, ShieldOff, ShieldCheck } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Loader2, Mail, ShieldOff, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 
@@ -10,7 +10,6 @@ export default function SettingsPage() {
   const router = useRouter()
   const [userId, setUserId] = useState<string | null>(null)
   const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
   const [otp, setOtp] = useState("")
   const [autoQuarantineEnabled, setAutoQuarantineEnabled] = useState(true)
   const [otpSent, setOtpSent] = useState(false)
@@ -36,7 +35,7 @@ export default function SettingsPage() {
         return
       }
       if (!authData.user) {
-        router.replace("/login")
+        router.replace("/login?next=%2Fsettings")
         return
       }
 
@@ -88,26 +87,21 @@ export default function SettingsPage() {
   }
 
   async function sendCode() {
-    if (!email.trim() || !password.trim()) {
-      setError("Enter your email and password before requesting the email code.")
-      return
-    }
-
     setBusy(true)
     setError(null)
     setNotice(null)
 
     try {
       const supabase = createSupabaseBrowserClient()
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      })
-      if (signInError) throw signInError
-      const accessToken = signInData.session?.access_token
-      if (!accessToken) throw new Error("The secure session could not be created.")
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) throw sessionError
+      const accessToken = sessionData.session?.access_token
+      if (!accessToken) {
+        router.replace("/login?next=%2Fsettings")
+        return
+      }
 
-      const response = await fetch("/api/auth/email-mfa/send", {
+      const response = await fetch("/api/auth/email-mfa/send?purpose=auto-quarantine", {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}` },
       })
@@ -137,7 +131,10 @@ export default function SettingsPage() {
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
       if (sessionError) throw sessionError
       const accessToken = sessionData.session?.access_token
-      if (!accessToken) throw new Error("Your secure session expired. Sign in again to continue.")
+      if (!accessToken) {
+        router.replace("/login?next=%2Fsettings")
+        return
+      }
 
       const response = await fetch("/api/auth/email-mfa/verify", {
         method: "POST",
@@ -145,14 +142,15 @@ export default function SettingsPage() {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ code: otp.trim() }),
+        body: JSON.stringify({ code: otp.trim(), purpose: "auto-quarantine" }),
       })
       const result = (await response.json()) as { error?: string }
       if (!response.ok) throw new Error(result.error ?? "Unable to verify the email code.")
 
-      await updateSetting(false)
+      setAutoQuarantineEnabled(false)
+      setNotice("Auto-quarantine is disabled for your account.")
+      setError(null)
       setOtp("")
-      setPassword("")
       setOtpSent(false)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to confirm the change.")
@@ -248,33 +246,10 @@ export default function SettingsPage() {
 
         {autoQuarantineEnabled && otpSent && (
           <div className="mt-5 space-y-4 rounded-lg border border-border bg-secondary/30 p-4">
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-                <Mail className="size-4 text-primary" />
-                Email
-              </label>
-              <input
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none ring-0 placeholder:text-muted-foreground"
-                placeholder="you@example.com"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm font-medium text-foreground">
-                <LockKeyhole className="size-4 text-primary" />
-                Password
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none ring-0 placeholder:text-muted-foreground"
-                placeholder="Enter your password"
-              />
-            </div>
-
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Mail className="size-4 text-primary" />
+              Enter the six-digit code sent to {email}.
+            </p>
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                 <CheckCircle2 className="size-4 text-primary" />
