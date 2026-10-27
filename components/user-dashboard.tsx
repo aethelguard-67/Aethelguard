@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useState, type FormEvent } from "react"
 import {
   AlertTriangle,
   CalendarClock,
@@ -9,7 +9,9 @@ import {
   Clock3,
   Download,
   FileWarning,
+  Globe2,
   LoaderCircle,
+  Search,
   ShieldAlert,
   ShieldCheck,
   X,
@@ -33,6 +35,21 @@ type UserRequest = {
   incident_id: string
   status: "pending" | "approved" | "rejected"
   requested_at: string
+}
+
+type UrlCheckResult = {
+  reputation: "malicious" | "suspicious" | "clean" | "unknown"
+  scanStatus?: string
+  analysisId?: string
+  threatScore?: number | null
+  stats?: {
+    malicious: number
+    suspicious: number
+    harmless: number
+    undetected: number
+    total: number
+  } | null
+  threatDetails?: string[]
 }
 
 function useUserIncidents(userId: string) {
@@ -120,6 +137,40 @@ function incidentReason(incident: Incident) {
   return [`${incident.malicious_engines} of ${incident.total_engines} security engines detected malicious content.`]
 }
 
+function isPrivateUrlHost(hostname: string) {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "")
+  if (
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host.endsWith(".local") ||
+    host.endsWith(".internal") ||
+    host.endsWith(".home.arpa") ||
+    host.endsWith(".lan") ||
+    host.endsWith(".test") ||
+    (!host.includes(".") && !host.includes(":"))
+  ) {
+    return true
+  }
+
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
+  if (ipv4) {
+    const octets = ipv4.slice(1).map(Number)
+    if (octets.some((octet) => octet > 255)) return true
+    const [first, second] = octets
+    return (
+      first === 0 ||
+      first === 10 ||
+      first === 127 ||
+      (first === 169 && second === 254) ||
+      (first === 172 && second >= 16 && second <= 31) ||
+      (first === 192 && second === 168) ||
+      first >= 224
+    )
+  }
+
+  return host === "::1" || /^(fc|fd)[0-9a-f]{2}:/i.test(host) || /^fe[89ab]/.test(host)
+}
+
 function ExtensionInstallNotice({ userId }: { userId: string }) {
   const [visible, setVisible] = useState(false)
   const storageKey = `aethelguard-extension-install-dismissed-${userId}`
@@ -179,6 +230,87 @@ function ExtensionInstallNotice({ userId }: { userId: string }) {
 export function UserDashboard({ userId }: { userId: string }) {
   const { incidents, blockedCount, pendingCount, error } = useUserIncidents(userId)
   const recentIncidents = incidents.slice(0, 5)
+  const [url, setUrl] = useState("")
+  const [urlError, setUrlError] = useState<string | null>(null)
+  const [urlResult, setUrlResult] = useState<UrlCheckResult | null>(null)
+  const [urlBusy, setUrlBusy] = useState(false)
+
+  async function checkUrl(analysisId?: string) {
+    setUrlError(null)
+    setUrlBusy(true)
+    try {
+      const supabase = createSupabaseBrowserClient()
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) throw new Error(sessionError.message)
+      if (!session?.access_token) throw new Error("Sign in again to check a URL.")
+
+      let endpoint = "/api/extension/scan-url"
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${session.access_token}`,
+      }
+      const init: RequestInit = {
+        method: "POST",
+        headers,
+        cache: "no-store",
+      }
+
+      if (analysisId) {
+        const query = new URLSearchParams({ analysisId })
+        endpoint += `?${query.toString()}`
+        init.method = "GET"
+      } else {
+        let parsed: URL
+        try {
+          parsed = new URL(url.trim())
+        } catch {
+          throw new Error("Enter a complete URL, including https://.")
+        }
+        if (
+          (parsed.protocol !== "http:" && parsed.protocol !== "https:") ||
+          parsed.username ||
+          parsed.password ||
+          isPrivateUrlHost(parsed.hostname)
+        ) {
+          throw new Error("Enter a valid public HTTP or HTTPS URL without embedded credentials.")
+        }
+        parsed.search = ""
+        parsed.hash = ""
+        headers["Content-Type"] = "application/json"
+        init.body = JSON.stringify({ url: parsed.toString() })
+      }
+
+      const response = await fetch(endpoint, init)
+      let result: UrlCheckResult & { error?: string; message?: string }
+      try {
+        result = await response.json()
+      } catch {
+        throw new Error("The URL reputation service returned an invalid response.")
+      }
+      if (!response.ok && response.status !== 202) {
+        throw new Error(result.error || `URL check failed (HTTP ${response.status}).`)
+      }
+
+      if (response.status === 202 || (result.scanStatus && result.scanStatus !== "completed")) {
+        setUrlResult({
+          reputation: "unknown",
+          scanStatus: result.scanStatus || "queued",
+          analysisId: result.analysisId || analysisId,
+        })
+      } else {
+        setUrlResult(result)
+      }
+    } catch (cause) {
+      setUrlError(cause instanceof Error ? cause.message : "Unable to check this URL.")
+    } finally {
+      setUrlBusy(false)
+    }
+  }
+
+  function submitUrl(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setUrlResult(null)
+    void checkUrl()
+  }
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
@@ -239,6 +371,121 @@ export function UserDashboard({ userId }: { userId: string }) {
       <p className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
         Files detected as malicious are quarantined automatically. Only an administrator can approve a release request.
       </p>
+
+      <section className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
+        <div className="flex items-center gap-3 border-b border-border px-5 py-4">
+          <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Globe2 className="size-4" />
+          </span>
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Check a URL</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">Review a link’s reputation before you visit it.</p>
+          </div>
+        </div>
+        <div className="p-5">
+          <form onSubmit={submitUrl} className="flex flex-col gap-3 sm:flex-row">
+            <label htmlFor="dashboard-url-check" className="sr-only">URL to check</label>
+            <input
+              id="dashboard-url-check"
+              type="url"
+              required
+              maxLength={2048}
+              value={url}
+              onChange={(event) => {
+                setUrl(event.target.value)
+                setUrlResult(null)
+                setUrlError(null)
+              }}
+              placeholder="https://example.com"
+              disabled={urlBusy}
+              className="h-10 min-w-0 flex-1 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60"
+            />
+            <Button type="submit" disabled={urlBusy || !url.trim()} className="gap-2">
+              {urlBusy ? <LoaderCircle className="size-4 animate-spin" /> : <Search className="size-4" />}
+              Check URL
+            </Button>
+          </form>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+            URL query strings and fragments are removed before checking. If no report exists, the URL is sent to VirusTotal to request a scan. A clean result does not guarantee a site is safe.
+          </p>
+
+          {urlError && (
+            <p role="alert" className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {urlError}
+            </p>
+          )}
+
+          {urlResult && (
+            <div
+              role="status"
+              className={
+                "mt-4 rounded-xl border p-4 " +
+                (urlResult.reputation === "malicious"
+                  ? "border-destructive/30 bg-destructive/5"
+                  : urlResult.reputation === "suspicious"
+                    ? "border-amber-500/30 bg-amber-500/5"
+                    : urlResult.reputation === "clean"
+                      ? "border-primary/30 bg-primary/5"
+                      : "border-border bg-muted/40")
+              }
+            >
+              <div className="flex flex-wrap items-start gap-3">
+                {urlResult.scanStatus && urlResult.scanStatus !== "completed" ? (
+                  <LoaderCircle className="mt-0.5 size-5 shrink-0 animate-spin text-primary" />
+                ) : urlResult.reputation === "malicious" || urlResult.reputation === "suspicious" ? (
+                  <ShieldAlert className="mt-0.5 size-5 shrink-0 text-destructive" />
+                ) : (
+                  <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold capitalize text-foreground">
+                    {urlResult.scanStatus && urlResult.scanStatus !== "completed"
+                      ? "Scan in progress"
+                      : `${urlResult.reputation} reputation`}
+                  </p>
+                  {urlResult.scanStatus && urlResult.scanStatus !== "completed" ? (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      VirusTotal is processing this URL. Check again shortly for the result.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {urlResult.stats
+                          ? `${urlResult.stats.malicious} malicious and ${urlResult.stats.suspicious} suspicious detections from ${urlResult.stats.total} engines.`
+                          : "No completed reputation result is available for this URL."}
+                        {urlResult.threatScore !== null && urlResult.threatScore !== undefined
+                          ? ` Threat score: ${urlResult.threatScore}/100.`
+                          : ""}
+                      </p>
+                      {urlResult.threatDetails && urlResult.threatDetails.length > 0 && (
+                        <ul className="mt-2 list-inside list-disc space-y-1 text-xs text-muted-foreground">
+                          {urlResult.threatDetails.map((detail, index) => <li key={`${index}-${detail}`}>{detail}</li>)}
+                        </ul>
+                      )}
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Reputation checks are signals, not a guarantee that a site is safe or harmful.
+                      </p>
+                    </>
+                  )}
+                  {urlResult.scanStatus && urlResult.scanStatus !== "completed" && urlResult.analysisId && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={urlBusy}
+                      onClick={() => void checkUrl(urlResult.analysisId)}
+                      className="mt-3 gap-2"
+                    >
+                      {urlBusy ? <LoaderCircle className="size-3.5 animate-spin" /> : <Search className="size-3.5" />}
+                      Check scan status
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   )
 }

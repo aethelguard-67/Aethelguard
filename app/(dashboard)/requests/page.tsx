@@ -22,42 +22,195 @@ type IncidentRow = { id: string; file_name: string; sha256: string; blocked_at: 
 
 function downloadRequestReport(request: RequestRow, profile?: ProfileRow, incident?: IncidentRow) {
   const pdf = new jsPDF()
-  const margin = 18
-  const lineHeight = 7
-  const pageBottom = 280
-  const contentWidth = pdf.internal.pageSize.getWidth() - margin * 2
-  let y = 22
+  const pageWidth = pdf.internal.pageSize.getWidth()
+  const pageHeight = pdf.internal.pageSize.getHeight()
+  const margin = 17
+  const contentWidth = pageWidth - margin * 2
+  const pageBottom = pageHeight - 22
+  const lineHeight = 5
+  const colors = {
+    ink: [25, 39, 61] as const,
+    muted: [103, 117, 137] as const,
+    accent: [18, 139, 137] as const,
+    pale: [241, 247, 248] as const,
+    border: [222, 230, 235] as const,
+    white: [255, 255, 255] as const,
+  }
+  let y = 0
 
-  function addText(value: string, options?: { bold?: boolean; gap?: number }) {
-    pdf.setFont("helvetica", options?.bold ? "bold" : "normal")
-    const lines = pdf.splitTextToSize(value, contentWidth) as string[]
-    for (const line of lines) {
-      if (y > pageBottom) {
-        pdf.addPage()
-        y = 20
+  function addPageHeader(isCover = false) {
+    if (isCover) {
+      pdf.setFillColor(...colors.ink)
+      pdf.rect(0, 0, pageWidth, 53, "F")
+      pdf.setFillColor(...colors.accent)
+      pdf.rect(0, 53, pageWidth, 2, "F")
+      pdf.setTextColor(...colors.white)
+      pdf.setFont("helvetica", "bold")
+      pdf.setFontSize(10)
+      pdf.text("AETHELGUARD", margin, 15)
+      pdf.setFont("helvetica", "normal")
+      pdf.setFontSize(8)
+      pdf.setTextColor(190, 207, 220)
+      pdf.text("SECURITY OPERATIONS  /  USER ISSUE", margin, 22)
+      pdf.setFont("helvetica", "bold")
+      pdf.setFontSize(19)
+      pdf.setTextColor(...colors.white)
+      pdf.text("Incident report", margin, 36)
+      pdf.setFont("helvetica", "normal")
+      pdf.setFontSize(8)
+      pdf.setTextColor(190, 207, 220)
+      pdf.text(`Generated ${new Date().toLocaleString()}`, margin, 45)
+
+      const statusColors: Record<RequestRow["status"], readonly [number, number, number]> = {
+        pending: [232, 171, 69],
+        approved: [71, 190, 149],
+        rejected: [226, 107, 112],
       }
-      pdf.text(line, margin, y)
-      y += lineHeight
+      const statusLabel = request.status.toUpperCase()
+      pdf.setFont("helvetica", "bold")
+      pdf.setFontSize(8)
+      const badgeWidth = pdf.getTextWidth(statusLabel) + 10
+      const badgeX = pageWidth - margin - badgeWidth
+      pdf.setFillColor(...statusColors[request.status])
+      pdf.roundedRect(badgeX, 10, badgeWidth, 8, 2, 2, "F")
+      pdf.setTextColor(...colors.white)
+      pdf.text(statusLabel, badgeX + 5, 15.5)
+      y = 66
+      return
     }
-    y += options?.gap ?? 2
+
+    pdf.setFillColor(...colors.ink)
+    pdf.rect(0, 0, pageWidth, 14, "F")
+    pdf.setFont("helvetica", "bold")
+    pdf.setFontSize(8)
+    pdf.setTextColor(...colors.white)
+    pdf.text("AETHELGUARD  /  INCIDENT REPORT", margin, 9)
+    pdf.setFont("helvetica", "normal")
+    pdf.setTextColor(...colors.muted)
+    pdf.text(`Request ${request.id.slice(0, 8)}`, pageWidth - margin, 9, { align: "right" })
+    y = 24
   }
 
-  pdf.setFontSize(18)
-  addText("Aethelguard User Issue Report", { bold: true, gap: 5 })
-  pdf.setFontSize(11)
-  addText(`Report generated: ${new Date().toLocaleString()}`)
-  addText(`Request ID: ${request.id}`)
-  addText(`Status: ${request.status}`)
-  addText(`User: ${profile?.display_name || profile?.email || request.user_id}`)
-  if (profile?.display_name && profile.email) addText(`Email: ${profile.email}`)
-  addText(`Submitted: ${new Date(request.requested_at).toLocaleString()}`)
-  if (request.reviewed_at) addText(`Reviewed: ${new Date(request.reviewed_at).toLocaleString()}`)
-  addText(`Affected file: ${incident?.file_name ?? "File name unavailable"}`)
-  addText(`SHA-256: ${incident?.sha256 ?? "Unavailable"}`)
-  addText(`Incident ID: ${request.incident_id}`)
-  if (incident?.blocked_at) addText(`Blocked: ${new Date(incident.blocked_at).toLocaleString()}`)
-  addText("Issue description submitted by user:", { bold: true, gap: 0 })
-  addText(request.reason)
+  function ensureSpace(height: number) {
+    if (y + height > pageBottom) {
+      pdf.addPage()
+      addPageHeader()
+    }
+  }
+
+  function addSectionHeading(title: string) {
+    ensureSpace(13)
+    pdf.setFillColor(...colors.accent)
+    pdf.roundedRect(margin, y - 3.2, 1.4, 5, 0.6, 0.6, "F")
+    pdf.setFont("helvetica", "bold")
+    pdf.setFontSize(9)
+    pdf.setTextColor(...colors.ink)
+    pdf.text(title.toUpperCase(), margin + 5, y)
+    y += 7
+  }
+
+  function addFieldRow(fields: { label: string; value: string; x: number; width: number }[]) {
+    const prepared = fields.map((field) => {
+      pdf.setFont("helvetica", "normal")
+      pdf.setFontSize(9)
+      return {
+        ...field,
+        lines: pdf.splitTextToSize(field.value, field.width) as string[],
+      }
+    })
+    const rowHeight = Math.max(...prepared.map((field) => 11 + field.lines.length * lineHeight))
+    ensureSpace(rowHeight + 3)
+
+    for (const field of prepared) {
+      pdf.setFont("helvetica", "bold")
+      pdf.setFontSize(7)
+      pdf.setTextColor(...colors.muted)
+      pdf.text(field.label.toUpperCase(), field.x, y)
+      pdf.setFont("helvetica", "normal")
+      pdf.setFontSize(9)
+      pdf.setTextColor(...colors.ink)
+      field.lines.forEach((line, index) => {
+        pdf.text(line, field.x, y + 5 + index * lineHeight)
+      })
+    }
+    y += rowHeight + 4
+  }
+
+  function addParagraph(text: string) {
+    pdf.setFont("helvetica", "normal")
+    pdf.setFontSize(10)
+    const lines = pdf.splitTextToSize(text || "No description provided.", contentWidth - 12) as string[]
+    const boxPadding = 7
+    let lineIndex = 0
+    while (lineIndex < lines.length) {
+      const availableLines = Math.floor((pageBottom - y - boxPadding * 2 - 1) / 5)
+      if (availableLines < 1) {
+        pdf.addPage()
+        addPageHeader()
+        continue
+      }
+
+      const chunk = lines.slice(lineIndex, lineIndex + availableLines)
+      const boxHeight = chunk.length * 5 + boxPadding * 2
+      pdf.setFillColor(...colors.pale)
+      pdf.setDrawColor(...colors.border)
+      pdf.roundedRect(margin, y, contentWidth, boxHeight, 2, 2, "FD")
+      pdf.setFillColor(...colors.accent)
+      pdf.roundedRect(margin, y, 1.2, boxHeight, 0.5, 0.5, "F")
+      y += boxPadding + 1
+      for (const line of chunk) {
+        pdf.setFont("helvetica", "normal")
+        pdf.setFontSize(10)
+        pdf.setTextColor(...colors.ink)
+        pdf.text(line, margin + 7, y)
+        y += 5
+      }
+      y += boxPadding + 3
+      lineIndex += chunk.length
+      if (lineIndex < lines.length) {
+        pdf.addPage()
+        addPageHeader()
+      }
+    }
+  }
+
+  addPageHeader(true)
+  addSectionHeading("Request & requester")
+  const halfWidth = (contentWidth - 10) / 2
+  addFieldRow([
+    { label: "Request ID", value: request.id, x: margin, width: halfWidth },
+    { label: "Submitted", value: new Date(request.requested_at).toLocaleString(), x: margin + halfWidth + 10, width: halfWidth },
+  ])
+  addFieldRow([
+    { label: "Requester", value: profile?.display_name || profile?.email || request.user_id, x: margin, width: halfWidth },
+    { label: "Email", value: profile?.email ?? "Unavailable", x: margin + halfWidth + 10, width: halfWidth },
+  ])
+  if (request.reviewed_at) {
+    addFieldRow([{ label: "Reviewed", value: new Date(request.reviewed_at).toLocaleString(), x: margin, width: contentWidth }])
+  }
+
+  addSectionHeading("Affected incident")
+  addFieldRow([
+    { label: "File name", value: incident?.file_name ?? "File name unavailable", x: margin, width: halfWidth },
+    { label: "Blocked", value: incident?.blocked_at ? new Date(incident.blocked_at).toLocaleString() : "Unavailable", x: margin + halfWidth + 10, width: halfWidth },
+  ])
+  addFieldRow([{ label: "SHA-256", value: incident?.sha256 ?? "Unavailable", x: margin, width: contentWidth }])
+  addFieldRow([{ label: "Incident ID", value: request.incident_id, x: margin, width: contentWidth }])
+
+  addSectionHeading("Issue description")
+  addParagraph(request.reason)
+
+  const pageCount = pdf.getNumberOfPages()
+  for (let page = 1; page <= pageCount; page += 1) {
+    pdf.setPage(page)
+    pdf.setDrawColor(...colors.border)
+    pdf.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15)
+    pdf.setFont("helvetica", "normal")
+    pdf.setFontSize(7)
+    pdf.setTextColor(...colors.muted)
+    pdf.text("CONFIDENTIAL  /  ADMINISTRATIVE USE", margin, pageHeight - 9)
+    pdf.text(`PAGE ${page} OF ${pageCount}`, pageWidth - margin, pageHeight - 9, { align: "right" })
+  }
 
   pdf.save(`aethelguard-issue-report-${request.id.slice(0, 8)}.pdf`)
 }
