@@ -16,6 +16,8 @@ server-side file-hash and URL reputation lookups. No sample records are inserted
    adds threat-score columns, and
    [`202610270001_guard_user_profile_settings.sql`](./supabase/migrations/202610270001_guard_user_profile_settings.sql)
    restricts regular users to changing their own auto-quarantine preference.
+   [`202610270002_url_reputation_activity.sql`](./supabase/migrations/202610270002_url_reputation_activity.sql)
+   adds the admin dashboard's daily unique URL reputation user counts.
 2. Copy `.env.example` to `.env.local`. Set `NEXT_PUBLIC_SUPABASE_URL` and
    `NEXT_PUBLIC_SUPABASE_ANON_KEY` from the project API settings. Set
    `SUPABASE_SERVICE_ROLE_KEY` from the project API settings and
@@ -84,6 +86,9 @@ Supabase user.
   `GET /api/extension/scan-url?url=<URL-encoded-URL>` to retrieve the URL report.
   Only HTTP and HTTPS URLs are accepted. The score uses the same formula as file
   scans and is not a probability.
+  Valid URL lookups and submissions count the authenticated user once per UTC
+  day in the admin dashboard; analysis-status polling is not counted. Only the
+  daily user activity is stored, not the URLs checked.
   Submitting a URL shares it with VirusTotal; do not submit private URLs or
   URLs containing sensitive tokens.
 - `POST /api/extension/unquarantine-requests` accepts

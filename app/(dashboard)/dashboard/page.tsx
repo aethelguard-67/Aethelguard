@@ -18,9 +18,25 @@ type RequestAlert = {
   file_name?: string
 }
 
-type QuarantineActivityDay = { date: string; count: number }
+type DailyActivityDay = { date: string; count: number }
 
-function QuarantineActivityChart({ days }: { days: QuarantineActivityDay[] }) {
+function DailyActivityChart({
+  days,
+  title,
+  description,
+  itemLabel,
+  singularItemLabel,
+  emptyMessage,
+  showTotal = true,
+}: {
+  days: DailyActivityDay[]
+  title: string
+  description: string
+  itemLabel: string
+  singularItemLabel: string
+  emptyMessage: string
+  showTotal?: boolean
+}) {
   const chartWidth = 760
   const chartHeight = 220
   const plotLeft = 42
@@ -38,24 +54,24 @@ function QuarantineActivityChart({ days }: { days: QuarantineActivityDay[] }) {
     <section className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">Quarantine Activity</h2>
-          <p className="mt-1 text-xs text-muted-foreground">Files quarantined per day over the last 30 days</p>
+          <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+          <p className="mt-1 text-xs text-muted-foreground">{description}</p>
         </div>
-        <p className="text-sm font-medium text-foreground">
-          <span className="font-mono text-lg tabular-nums">{total}</span>{" "}
-          <span className="text-muted-foreground">files quarantined</span>
-        </p>
+        {showTotal && (
+          <p className="text-sm font-medium text-foreground">
+            <span className="font-mono text-lg tabular-nums">{total}</span>{" "}
+            <span className="text-muted-foreground">{itemLabel}</span>
+          </p>
+        )}
       </div>
       <div className="px-3 py-4 sm:px-5">
         {total === 0 ? (
-          <p className="py-16 text-center text-sm text-muted-foreground">
-            No quarantined files recorded in the last 30 days.
-          </p>
+          <p className="py-16 text-center text-sm text-muted-foreground">{emptyMessage}</p>
         ) : (
           <svg
             viewBox={`0 0 ${chartWidth} ${chartHeight}`}
             role="img"
-            aria-label={`Quarantine activity in the last 30 days: ${total} files across ${days.filter((day) => day.count > 0).length} days.`}
+            aria-label={`${title}, daily counts over the last 30 days. ${days.filter((day) => day.count > 0).length} days had activity.`}
             className="h-auto w-full overflow-visible"
           >
             {tickValues.map((value) => {
@@ -93,7 +109,7 @@ function QuarantineActivityChart({ days }: { days: QuarantineActivityDay[] }) {
                     rx="3"
                     className="fill-primary"
                   >
-                    <title>{`${labelDate}: ${day.count} ${day.count === 1 ? "file" : "files"} quarantined`}</title>
+                    <title>{`${labelDate}: ${day.count} ${day.count === 1 ? singularItemLabel : itemLabel}`}</title>
                   </rect>
                   {labelIndexes.includes(index) && (
                     <text
@@ -111,7 +127,7 @@ function QuarantineActivityChart({ days }: { days: QuarantineActivityDay[] }) {
           </svg>
         )}
         <p className="mt-2 text-xs text-muted-foreground">
-          Each bar shows the number of quarantine incidents recorded on that date.
+          Each bar shows the number of {itemLabel} recorded on that date.
         </p>
       </div>
     </section>
@@ -121,7 +137,8 @@ function QuarantineActivityChart({ days }: { days: QuarantineActivityDay[] }) {
 function DashboardOverview() {
   const [quarantinedCount, setQuarantinedCount] = useState<string>("—")
   const [activeUsersCount, setActiveUsersCount] = useState<string>("—")
-  const [quarantineActivity, setQuarantineActivity] = useState<QuarantineActivityDay[]>([])
+  const [quarantineActivity, setQuarantineActivity] = useState<DailyActivityDay[]>([])
+  const [urlReputationActivity, setUrlReputationActivity] = useState<DailyActivityDay[]>([])
   const [pendingCount, setPendingCount] = useState(0)
   const [alerts, setAlerts] = useState<RequestAlert[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -134,7 +151,7 @@ function DashboardOverview() {
       const date = new Date(todayUtc - (29 - index) * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
       return { date, count: 0 }
     })
-    const [files, users, requests, incidents] = await Promise.all([
+    const [files, users, requests, incidents, urlActivity] = await Promise.all([
       supabase.from("block_incidents").select("id", { count: "exact", head: true }).eq("status", "blocked"),
       supabase
         .from("profiles")
@@ -153,9 +170,10 @@ function DashboardOverview() {
         .select("blocked_at")
         .gte("blocked_at", `${activityDays[0].date}T00:00:00.000Z`)
         .order("blocked_at", { ascending: true }),
+      supabase.rpc("get_url_reputation_daily_users"),
     ])
 
-    const failed = [files.error, users.error, requests.error, incidents.error].find(Boolean)
+    const failed = [files.error, users.error, requests.error, incidents.error, urlActivity.error].find(Boolean)
     if (failed) {
       setError(failed.message)
       return
@@ -168,6 +186,13 @@ function DashboardOverview() {
       if (count !== undefined) countsByDate.set(date, count + 1)
     }
     setQuarantineActivity(activityDays.map((day) => ({ ...day, count: countsByDate.get(day.date) ?? 0 })))
+    const urlActivityRows: { activity_date: string; user_count: number }[] = urlActivity.data ?? []
+    setUrlReputationActivity(
+      urlActivityRows.map(({ activity_date, user_count }) => ({
+        date: activity_date,
+        count: Number(user_count),
+      })),
+    )
 
     const pendingRequests = requests.data ?? []
     let enrichedRequests: RequestAlert[] = pendingRequests
@@ -274,7 +299,24 @@ function DashboardOverview() {
         />
       </div>
 
-      <QuarantineActivityChart days={quarantineActivity} />
+      <DailyActivityChart
+        days={quarantineActivity}
+        title="Quarantine Activity"
+        description="Files quarantined per day over the last 30 days"
+        itemLabel="files quarantined"
+        singularItemLabel="file quarantined"
+        emptyMessage="No quarantined files recorded in the last 30 days."
+      />
+
+      <DailyActivityChart
+        days={urlReputationActivity}
+        title="URL Reputation Users"
+        description="Unique users who checked URLs per day over the last 30 days"
+        itemLabel="unique users"
+        singularItemLabel="unique user"
+        emptyMessage="No URL reputation checks recorded in the last 30 days."
+        showTotal={false}
+      />
 
       <section className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
         <div className="flex items-center gap-2 border-b border-border px-5 py-4">

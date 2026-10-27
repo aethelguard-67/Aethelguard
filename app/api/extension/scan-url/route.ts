@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { authenticateExtension } from "@/lib/supabase/extension-auth"
+import { createSupabaseServiceClient } from "@/lib/supabase/server"
 import { calculateThreatScore } from "@/lib/threat-scoring"
 
 type VirusTotalStats = {
@@ -212,6 +213,27 @@ async function handleRequest(request: Request, submitIfMissing: boolean) {
       { error: "Provide a valid HTTP or HTTPS URL without embedded credentials (maximum 2,048 characters)." },
       { status: 400 },
     )
+  }
+
+  try {
+    const { error } = await createSupabaseServiceClient()
+      .from("url_reputation_activity")
+      .upsert(
+        {
+          user_id: auth.user.id,
+          activity_date: new Date().toISOString().slice(0, 10),
+        },
+        { onConflict: "user_id,activity_date", ignoreDuplicates: true },
+      )
+    if (error) {
+      return NextResponse.json(
+        { error: `Unable to record URL reputation activity: ${error.message}` },
+        { status: 500 },
+      )
+    }
+  } catch (cause) {
+    const detail = cause instanceof Error ? cause.message : "Service role is not configured."
+    return NextResponse.json({ error: detail }, { status: 503 })
   }
 
   const urlId = Buffer.from(submittedUrl, "utf8").toString("base64url")
