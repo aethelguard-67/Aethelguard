@@ -2,7 +2,18 @@
 
 import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
-import { AlertTriangle, CalendarClock, CheckCircle2, Clock3, FileWarning, LoaderCircle, ShieldAlert, ShieldCheck } from "lucide-react"
+import {
+  AlertTriangle,
+  CalendarClock,
+  CheckCircle2,
+  Clock3,
+  Download,
+  FileWarning,
+  LoaderCircle,
+  ShieldAlert,
+  ShieldCheck,
+  X,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { StatCard } from "@/components/stat-card"
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"
@@ -109,12 +120,71 @@ function incidentReason(incident: Incident) {
   return [`${incident.malicious_engines} of ${incident.total_engines} security engines detected malicious content.`]
 }
 
+function ExtensionInstallNotice({ userId }: { userId: string }) {
+  const [visible, setVisible] = useState(false)
+  const storageKey = `aethelguard-extension-install-dismissed-${userId}`
+
+  useEffect(() => {
+    setVisible(window.localStorage.getItem(storageKey) !== "true")
+  }, [storageKey])
+
+  function dismiss() {
+    window.localStorage.setItem(storageKey, "true")
+    setVisible(false)
+  }
+
+  if (!visible) return null
+
+  return (
+    <aside
+      aria-label="Install the Aethelguard browser extension"
+      className="fixed right-4 top-4 z-50 w-[min(24rem,calc(100vw-2rem))] rounded-xl border border-primary/30 bg-card p-4 text-card-foreground shadow-xl sm:right-6 sm:top-6"
+    >
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Download className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-semibold">Protect your Chrome downloads</h2>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Install the Aethelguard extension to check URLs and scan completed downloads. Download the project ZIP,
+            load its <span className="font-mono">chrome-extension</span> folder in Chrome, then run the included
+            Windows helper installer for file scanning.
+          </p>
+          <a
+            href="https://github.com/aethelguard-67/Aethelguard"
+            target="_blank"
+            rel="noreferrer"
+            onClick={dismiss}
+            className="mt-3 inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            <Download className="size-3.5" />
+            View extension download
+          </a>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Manual installation is required; the extension is not yet in the Chrome Web Store.
+          </p>
+        </div>
+        <button
+          type="button"
+          aria-label="Dismiss extension installation notice"
+          onClick={dismiss}
+          className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+    </aside>
+  )
+}
+
 export function UserDashboard({ userId }: { userId: string }) {
   const { incidents, blockedCount, pendingCount, error } = useUserIncidents(userId)
   const recentIncidents = incidents.slice(0, 5)
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
+      <ExtensionInstallNotice userId={userId} />
       <div className="relative overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/10 via-card to-card px-6 py-7 shadow-sm md:px-8 md:py-8">
         <div className="relative z-10">
           <span className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/70 px-3 py-1 text-xs font-medium text-primary">

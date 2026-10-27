@@ -39,10 +39,11 @@ server. File contents remain on the computer.
    Enter the extension ID when prompted. The installer builds a small
    Windows-only native helper and registers it for the current Windows user;
    administrator access is not required. Reload the extension in Chrome.
-4. Start the Aethelguard app on the same computer and leave it running. The
-   extension connects to `http://localhost:3000` and automatically gets the
-   app's public Supabase URL and publishable/anon key. It does not ask each user
-   to enter those values. The service-role key and VirusTotal key stay server-side.
+4. The extension connects to the hosted Aethelguard app at
+   `https://www.aethelguard.xyz` and automatically gets the app's public
+   Supabase URL and publishable/anon key. The site must be deployed and its
+   domain configured before connecting. It does not ask each user to enter
+   those values. The service-role key and VirusTotal key stay server-side.
 5. Open the extension popup and sign in once with an existing Supabase
    email/password account that has a profile. The extension keeps the refresh
    token in Chrome storage and refreshes its access token as needed; it does not
@@ -53,11 +54,12 @@ server. File contents remain on the computer.
 7. To have protection resume when you turn on the PC, enable Google Chrome in
    **Windows Settings → Apps → Startup** (or place a Chrome shortcut in the
    Windows Startup folder). Chrome starts its installed extensions with the
-   browser. This starts after your Windows account signs in; Chrome extensions
-   cannot run before Windows sign-in. Configure the Aethelguard app itself to
-   start with Windows as well; otherwise the extension cannot connect until the
-   app is started manually. This localhost setup only supports Chrome on the
-   same computer as the app.
+   browser after your Windows account signs in.
+
+URL reputation checks use the hosted API. Completed-download hash scanning
+also requires the Windows native host installed in step 3 and only scans files
+inside the current user's Downloads folder. If the extension is reinstalled
+with a different ID, rerun the installer with the new ID.
 
 URL reports show the number of VirusTotal scanners that flagged the URL as
 malicious or suspicious rather than a normalized score. On malicious or

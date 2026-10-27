@@ -3,7 +3,7 @@ const message = document.getElementById("message")
 const signOut = document.getElementById("signOut")
 const connect = document.getElementById("connect")
 const connectionStatus = document.getElementById("connectionStatus")
-const LOCAL_APP_URL = "http://localhost:3000"
+const APP_URL = "https://www.aethelguard.xyz"
 
 function showMessage(text, type = "error") {
   message.textContent = text
@@ -22,8 +22,8 @@ async function loadState() {
   const saved = await chrome.storage.local.get(["apiBaseUrl", "supabaseUrl", "supabaseAnonKey", "session"])
   const configured = Boolean(saved.apiBaseUrl && saved.supabaseUrl && saved.supabaseAnonKey)
   connectionStatus.textContent = configured
-    ? "Connected to the Aethelguard app on this device."
-    : "Start the Aethelguard app on this device to configure protection."
+    ? "Connected to the hosted Aethelguard service."
+    : "Connect to the Aethelguard service to configure protection."
   loginForm.hidden = !configured || Boolean(saved.session?.refresh_token)
   connect.hidden = configured
   if (saved.session?.refresh_token && configured) {
@@ -36,25 +36,27 @@ async function loadState() {
 
 async function connectToApp() {
   connect.disabled = true
-  showMessage("Connecting to the local Aethelguard app…", "success")
+  showMessage("Connecting to Aethelguard…", "success")
   try {
-    const response = await fetch(`${LOCAL_APP_URL}/api/extension/config`, { cache: "no-store" })
+    const response = await fetch(`${APP_URL}/api/extension/config`, { cache: "no-store" })
     const result = await readJson(response)
     if (!response.ok || !result.supabaseUrl || !result.supabaseAnonKey) {
       throw new Error(result.error ?? `Unable to load app configuration (HTTP ${response.status}).`)
     }
     await chrome.storage.local.set({
-      apiBaseUrl: LOCAL_APP_URL,
+      apiBaseUrl: APP_URL,
       supabaseUrl: result.supabaseUrl,
       supabaseAnonKey: result.supabaseAnonKey,
     })
     showMessage("Connected. Sign in with your Aethelguard account to enable protection.", "success")
     await loadState()
   } catch (error) {
+    await chrome.storage.local.remove(["apiBaseUrl", "supabaseUrl", "supabaseAnonKey"])
+    await loadState()
     showMessage(
       error instanceof Error
-        ? `Could not reach Aethelguard at ${LOCAL_APP_URL}. Start the app and try again. (${error.message})`
-        : `Could not reach Aethelguard at ${LOCAL_APP_URL}. Start the app and try again.`,
+        ? `Could not reach Aethelguard at ${APP_URL}. Check the site is online and try again. (${error.message})`
+        : `Could not reach Aethelguard at ${APP_URL}. Check the site is online and try again.`,
     )
   } finally {
     connect.disabled = false
@@ -108,9 +110,4 @@ signOut.addEventListener("click", async () => {
   await loadState()
 })
 
-void loadState().then(async () => {
-  const saved = await chrome.storage.local.get(["apiBaseUrl", "supabaseUrl", "supabaseAnonKey"])
-  if (!saved.apiBaseUrl || !saved.supabaseUrl || !saved.supabaseAnonKey) {
-    await connectToApp()
-  }
-})
+void loadState().then(connectToApp)

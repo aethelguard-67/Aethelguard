@@ -4,6 +4,7 @@
   const host = document.createElement("div")
   host.id = "aethelguard-url-guard"
   host.style.cssText = "all:initial;position:fixed;right:16px;top:16px;z-index:2147483647"
+  let dismissTimer
   const shadow = host.attachShadow({ mode: "closed" })
   const style = document.createElement("style")
   style.textContent = `
@@ -34,7 +35,10 @@
   close.type = "button"
   close.setAttribute("aria-label", "Dismiss URL report")
   close.textContent = "×"
-  close.addEventListener("click", () => host.remove())
+  close.addEventListener("click", () => {
+    clearTimeout(dismissTimer)
+    host.remove()
+  })
   top.append(brand, score, close)
   const status = document.createElement("span")
   status.className = "status other"
@@ -60,6 +64,11 @@
   card.append(top, status, message, details, foot, actions)
   shadow.append(style, card)
   document.documentElement.append(host)
+
+  function scheduleDismiss() {
+    clearTimeout(dismissTimer)
+    dismissTimer = setTimeout(() => host.remove(), 6_000)
+  }
 
   function display(result) {
     const state = result.status
@@ -89,9 +98,13 @@
       score.textContent = "No score"
       message.textContent = result.message || "No reputation result is available for this URL."
     }
+
+    scheduleDismiss()
   }
 
   function checkUrl(url) {
+    clearTimeout(dismissTimer)
+    if (!host.isConnected) document.documentElement.append(host)
     status.textContent = "Checking"
     status.className = "status other"
     score.textContent = "Checking URL…"
@@ -106,6 +119,7 @@
         status.textContent = "Unavailable"
         status.className = "status other"
         score.textContent = "No score"
+        scheduleDismiss()
         return
       }
       if (response?.error) {
@@ -113,6 +127,7 @@
         status.textContent = "Unavailable"
         status.className = "status other"
         score.textContent = "No score"
+        scheduleDismiss()
         return
       }
       if (response?.result) display(response.result)
