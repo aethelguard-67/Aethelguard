@@ -48,6 +48,10 @@ server. File contents remain on the computer.
    email/password account that has a profile. The extension keeps the refresh
    token in Chrome storage and refreshes its access token as needed; it does not
    ask for the password again unless the session expires or is signed out.
+   Turning URL checks off in the popup does not sign out or stop download
+   scanning; the account session is still needed for file reputation checks and
+   auto-quarantine. **Sign out and stop download scanning** removes the saved
+   session and stops both features until the user signs in again.
 6. Grant the extension site access when Chrome asks. Its download and
    notification permissions are used to process completed downloads and show
    the result.

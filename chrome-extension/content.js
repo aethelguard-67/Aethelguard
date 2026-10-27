@@ -122,6 +122,11 @@
         scheduleDismiss()
         return
       }
+      if (response?.disabled) {
+        clearTimeout(dismissTimer)
+        host.remove()
+        return
+      }
       if (response?.error) {
         message.textContent = response.error
         status.textContent = "Unavailable"

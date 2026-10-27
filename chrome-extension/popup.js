@@ -1,6 +1,7 @@
 const loginForm = document.getElementById("login")
 const message = document.getElementById("message")
 const signOut = document.getElementById("signOut")
+const urlChecks = document.getElementById("urlChecks")
 const connect = document.getElementById("connect")
 const connectionStatus = document.getElementById("connectionStatus")
 const APP_URL = "https://www.aethelguard.xyz"
@@ -19,19 +20,21 @@ async function readJson(response) {
 }
 
 async function loadState() {
-  const saved = await chrome.storage.local.get(["apiBaseUrl", "supabaseUrl", "supabaseAnonKey", "session"])
+  const saved = await chrome.storage.local.get(["apiBaseUrl", "supabaseUrl", "supabaseAnonKey", "session", "urlChecksEnabled"])
   const configured = Boolean(saved.apiBaseUrl && saved.supabaseUrl && saved.supabaseAnonKey)
+  const signedIn = Boolean(saved.session?.refresh_token)
+  const urlChecksEnabled = saved.urlChecksEnabled !== false
   connectionStatus.textContent = configured
-    ? "Connected to the hosted Aethelguard service."
+    ? signedIn
+      ? `Signed in. Download scanning is active; URL checks are ${urlChecksEnabled ? "on" : "off"}.`
+      : "Connect and sign in to enable download scanning and URL checks."
     : "Connect to the Aethelguard service to configure protection."
-  loginForm.hidden = !configured || Boolean(saved.session?.refresh_token)
+  loginForm.hidden = !configured || signedIn
   connect.hidden = configured
-  if (saved.session?.refresh_token && configured) {
-    showMessage("Account saved. Protection will resume when Chrome starts and refresh your session when needed.", "success")
-    signOut.hidden = false
-  } else {
-    signOut.hidden = true
-  }
+  urlChecks.hidden = !signedIn || !configured
+  urlChecks.textContent = `Turn ${urlChecksEnabled ? "off" : "on"} URL checks`
+  signOut.hidden = !signedIn || !configured
+  if (signedIn && configured) showMessage("Download protection uses your account setting. Keep this session to scan and quarantine files.", "success")
 }
 
 async function connectToApp() {
@@ -64,6 +67,19 @@ async function connectToApp() {
 }
 
 connect.addEventListener("click", () => void connectToApp())
+
+urlChecks.addEventListener("click", async () => {
+  const { urlChecksEnabled } = await chrome.storage.local.get("urlChecksEnabled")
+  const nextEnabled = urlChecksEnabled === false
+  await chrome.storage.local.set({ urlChecksEnabled: nextEnabled })
+  showMessage(
+    nextEnabled
+      ? "URL checks are on. Download scanning and quarantine remain active."
+      : "URL checks are off. Download scanning and quarantine remain active while you stay signed in.",
+    "success",
+  )
+  await loadState()
+})
 
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault()
@@ -106,7 +122,8 @@ loginForm.addEventListener("submit", async (event) => {
 
 signOut.addEventListener("click", async () => {
   await chrome.storage.local.remove("session")
-  showMessage("Signed out. Sign in again to enable protection.", "success")
+  await chrome.storage.local.set({ urlChecksEnabled: false })
+  showMessage("Signed out. Download scanning and URL checks are now off.", "success")
   await loadState()
 })
 

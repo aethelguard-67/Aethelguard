@@ -171,11 +171,20 @@ async function requestReport(url) {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type !== "AETHELGUARD_CHECK_URL" || typeof message.url !== "string") return
 
-  checkUrl(message.url)
-    .then((result) => sendResponse({ result }))
-    .catch((error) => {
-      sendResponse({ error: error instanceof Error ? error.message : "Unable to check this URL." })
+  chrome.storage.local.get("urlChecksEnabled")
+    .then(({ urlChecksEnabled }) => {
+      if (urlChecksEnabled === false) {
+        sendResponse({ disabled: true })
+        return
+      }
+
+      checkUrl(message.url)
+        .then((result) => sendResponse({ result }))
+        .catch((error) => {
+          sendResponse({ error: error instanceof Error ? error.message : "Unable to check this URL." })
+        })
     })
+    .catch(() => sendResponse({ error: "Unable to read the URL check setting." }))
   return true
 })
 

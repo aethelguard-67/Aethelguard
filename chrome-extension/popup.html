@@ -12,7 +12,7 @@
         <img src="icons/aethelguard.png" alt="Aethelguard logo">
         <h1>Aethelguard URL Guard</h1>
       </header>
-      <p class="intro">Check URL reputation while browsing and scan completed downloads.</p>
+      <p class="intro">Control URL checks and scan completed downloads.</p>
       <p id="connectionStatus" class="status"></p>
       <button id="connect" type="button" class="secondary">Connect to Aethelguard</button>
       <form id="login">
@@ -26,7 +26,8 @@
         </label>
         <button type="submit">Sign in</button>
       </form>
-      <button id="signOut" type="button" class="secondary" hidden>Sign out</button>
+      <button id="urlChecks" type="button" class="secondary" hidden></button>
+      <button id="signOut" type="button" class="secondary" hidden>Sign out and stop download scanning</button>
       <p id="message" role="status" aria-live="polite"></p>
       <p class="privacy">Download checks hash files locally; only hashes are sent to VirusTotal. Confirmed malicious files are moved to Aethelguard quarantine. Unknown files are left in Downloads and are not uploaded.</p>
     </main>
