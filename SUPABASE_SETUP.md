@@ -11,9 +11,11 @@ server-side file-hash and URL reputation lookups. No sample records are inserted
 
 1. Create a Supabase project and run the SQL files in `supabase/migrations/` in
    chronological order. For an existing project, apply any newly added
-   migration files as well; in particular,
+   migration files as well. In particular,
    [`202610150001_quarantine_threat_columns.sql`](./supabase/migrations/202610150001_quarantine_threat_columns.sql)
-   adds the threat-score columns used by the quarantine dashboard and scan API.
+   adds threat-score columns, and
+   [`202610270001_guard_user_profile_settings.sql`](./supabase/migrations/202610270001_guard_user_profile_settings.sql)
+   restricts regular users to changing their own auto-quarantine preference.
 2. Copy `.env.example` to `.env.local`. Set `NEXT_PUBLIC_SUPABASE_URL` and
    `NEXT_PUBLIC_SUPABASE_ANON_KEY` from the project API settings. Set
    `SUPABASE_SERVICE_ROLE_KEY` from the project API settings and
