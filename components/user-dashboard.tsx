@@ -147,19 +147,17 @@ function ExtensionInstallNotice({ userId }: { userId: string }) {
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold">Protect your Chrome downloads</h2>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Install the Aethelguard extension to check URLs and scan completed downloads. Download the project ZIP,
-            load its <span className="font-mono">chrome-extension</span> folder in Chrome, then run the included
-            Windows helper installer for file scanning.
+            Install the Aethelguard extension to check URLs and scan completed downloads. Download and extract the
+            extension ZIP, load its <span className="font-mono">chrome-extension</span> folder in Chrome, then run
+            the included Windows helper installer for file scanning.
           </p>
           <a
-            href="https://github.com/aethelguard-67/Aethelguard"
-            target="_blank"
-            rel="noreferrer"
+            href="/api/extension/download"
             onClick={dismiss}
             className="mt-3 inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90"
           >
             <Download className="size-3.5" />
-            View extension download
+            Download extension files
           </a>
           <p className="mt-2 text-[11px] text-muted-foreground">
             Manual installation is required; the extension is not yet in the Chrome Web Store.

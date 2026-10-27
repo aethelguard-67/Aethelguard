@@ -20,7 +20,7 @@ import { createSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabas
 
 const extensionRepoUrl = "https://github.com/aethelguard-67/Aethelguard"
 const extensionGuideUrl = `${extensionRepoUrl}/blob/main/chrome-extension/README.md`
-const extensionZipUrl = `${extensionRepoUrl}/archive/refs/heads/main.zip`
+const extensionZipUrl = "/api/extension/download"
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -452,7 +452,7 @@ export default function SettingsPage() {
           </p>
         </div>
         <ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
-          <li>Download and extract the project ZIP, then load its <code className="font-mono text-foreground">chrome-extension</code> folder at <code className="font-mono text-foreground">chrome://extensions</code> with Developer mode enabled.</li>
+          <li>Download and extract the extension ZIP, then load the extracted <code className="font-mono text-foreground">chrome-extension</code> folder at <code className="font-mono text-foreground">chrome://extensions</code> with Developer mode enabled.</li>
           <li>On Windows, run the included native helper installer to enable local file hashing and quarantine.</li>
           <li>Open the extension popup and sign in. URL checks can be toggled separately; download scanning requires the extension session.</li>
         </ol>

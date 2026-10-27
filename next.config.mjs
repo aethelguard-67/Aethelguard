@@ -6,6 +6,9 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  outputFileTracingIncludes: {
+    '/api/extension/download': ['./chrome-extension/**/*'],
+  },
 }
 
 export default nextConfig
