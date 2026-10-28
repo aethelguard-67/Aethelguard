@@ -17,7 +17,7 @@ async function collectExtensionFiles(directory: string): Promise<Record<string, 
       Object.assign(files, await collectExtensionFiles(filePath))
     } else if (entry.isFile()) {
       const archivePath = relative(extensionDirectory, filePath).split(sep).join("/")
-      files[`chrome-extension/${archivePath}`] = await readFile(filePath)
+      files[archivePath] = await readFile(filePath)
     } else {
       throw new Error(`Unsupported file in Chrome extension directory: ${filePath}`)
     }

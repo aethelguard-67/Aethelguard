@@ -30,10 +30,16 @@ server. File contents remain on the computer.
 1. Set `VIRUSTOTAL_API_KEY` in the Aethelguard app's `.env.local`, then start or
    restart the Next.js app.
 2. Open `chrome://extensions`, enable **Developer mode**, and choose **Load
-   unpacked**. Select this `chrome-extension` folder. Copy the extension ID
-   shown on its card.
-3. From the project folder, open PowerShell and run:
+   unpacked**. Select the extracted extension folder containing `manifest.json`
+   (or this `chrome-extension` folder when installing from the project). Copy
+   the extension ID shown on its card.
+3. From the extracted extension folder (or the project folder when installing
+   from the repository), open PowerShell and run the matching command:
    ```powershell
+   # Downloaded ZIP
+   powershell -ExecutionPolicy Bypass -File .\Install-NativeHost.ps1
+
+   # Project repository
    powershell -ExecutionPolicy Bypass -File .\chrome-extension\Install-NativeHost.ps1
    ```
    Enter the extension ID when prompted. The installer builds a small
@@ -73,6 +79,10 @@ labelled unrated. Private and local URLs are skipped.
 To remove the Windows helper, run:
 
 ```powershell
+# Downloaded ZIP
+powershell -ExecutionPolicy Bypass -File .\Install-NativeHost.ps1 -Uninstall
+
+# Project repository
 powershell -ExecutionPolicy Bypass -File .\chrome-extension\Install-NativeHost.ps1 -Uninstall
 ```
 

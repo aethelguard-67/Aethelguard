@@ -452,7 +452,7 @@ export default function SettingsPage() {
           </p>
         </div>
         <ol className="list-decimal space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
-          <li>Download and extract the extension ZIP, then load the extracted <code className="font-mono text-foreground">chrome-extension</code> folder at <code className="font-mono text-foreground">chrome://extensions</code> with Developer mode enabled.</li>
+          <li>Download and extract the extension ZIP, then load the extracted folder containing <code className="font-mono text-foreground">manifest.json</code> at <code className="font-mono text-foreground">chrome://extensions</code> with Developer mode enabled.</li>
           <li>On Windows, run the included native helper installer to enable local file hashing and quarantine.</li>
           <li>Open the extension popup and sign in. URL checks can be toggled separately; download scanning requires the extension session.</li>
         </ol>
