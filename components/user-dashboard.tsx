@@ -189,40 +189,27 @@ function ExtensionInstallNotice({ userId }: { userId: string }) {
   return (
     <aside
       aria-label="Install the Aethelguard browser extension"
-      className="fixed right-4 top-4 z-50 w-[min(24rem,calc(100vw-2rem))] rounded-xl border border-primary/30 bg-card p-4 text-card-foreground shadow-xl sm:right-6 sm:top-6"
+      className="flex items-center gap-2 rounded-xl border border-primary/20 bg-card/90 px-3 py-2 text-card-foreground"
     >
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <Download className="size-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold">Protect your Chrome downloads</h2>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Install the Aethelguard extension to check URLs and scan completed downloads. Download and extract the
-            extension ZIP, extract it, and load the extracted folder containing <span className="font-mono">manifest.json</span>
-            in Chrome. Then run the included Windows helper installer for file scanning.
-          </p>
-          <a
-            href="/api/extension/download"
-            onClick={dismiss}
-            className="mt-3 inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            <Download className="size-3.5" />
-            Download extension files
-          </a>
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            Manual installation is required; the extension is not yet in the Chrome Web Store.
-          </p>
-        </div>
-        <button
-          type="button"
-          aria-label="Dismiss extension installation notice"
-          onClick={dismiss}
-          className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <X className="size-4" />
-        </button>
-      </div>
+      <Download className="size-4 shrink-0 text-primary" />
+      <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+        Protect URLs and downloads with the Aethelguard Chrome extension.
+      </p>
+      <a
+        href="/api/extension/download"
+        onClick={dismiss}
+        className="shrink-0 text-xs font-medium text-primary hover:underline"
+      >
+        Download
+      </a>
+      <button
+        type="button"
+        aria-label="Dismiss extension installation notice"
+        onClick={dismiss}
+        className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+      >
+        <X className="size-3.5" />
+      </button>
     </aside>
   )
 }
@@ -313,16 +300,16 @@ export function UserDashboard({ userId }: { userId: string }) {
   }
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-3">
       <ExtensionInstallNotice userId={userId} />
-      <div className="relative overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/10 via-card to-card px-6 py-7 shadow-sm md:px-8 md:py-8">
+      <div className="relative overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/10 via-card to-card px-5 py-4 shadow-sm md:px-6">
         <div className="relative z-10">
-          <span className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/70 px-3 py-1 text-xs font-medium text-primary">
+          <span className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/70 px-2.5 py-1 text-[11px] font-medium text-primary">
             <ShieldCheck className="size-3.5" />
             Personal security
           </span>
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">My Dashboard</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">My Dashboard</h1>
+          <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
             See files quarantined by Aethelguard and track your requests to restore them.
           </p>
         </div>
@@ -331,13 +318,14 @@ export function UserDashboard({ userId }: { userId: string }) {
 
       {error && <ErrorNotice message={error} />}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <StatCard label="Files Quarantined" value={String(blockedCount)} icon={FileWarning} tone="destructive" hint="All recorded quarantine incidents" />
-        <StatCard label="Pending Requests" value={String(pendingCount)} icon={Clock3} tone="sky" hint="Awaiting administrator review" />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <StatCard label="Files Quarantined" value={String(blockedCount)} icon={FileWarning} tone="destructive" hint="All recorded quarantine incidents" compact />
+        <StatCard label="Pending Requests" value={String(pendingCount)} icon={Clock3} tone="sky" hint="Awaiting administrator review" compact />
       </div>
 
+      <div className="grid items-start gap-3 xl:grid-cols-2">
       <section className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
-        <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-4">
+        <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
           <CalendarClock className="size-4 text-primary" />
           <h2 className="text-sm font-semibold text-foreground">Recently Quarantined Files</h2>
           <Link href="/quarantine" className="ml-auto text-sm font-medium text-primary hover:underline">
@@ -345,45 +333,44 @@ export function UserDashboard({ userId }: { userId: string }) {
           </Link>
         </div>
         {recentIncidents.length === 0 ? (
-          <p className="px-5 py-8 text-center text-sm text-muted-foreground">No quarantined files have been recorded.</p>
+          <p className="px-5 py-6 text-center text-sm text-muted-foreground">No quarantined files have been recorded.</p>
         ) : (
           <ul className="divide-y divide-border">
             {recentIncidents.map((incident) => (
-              <li key={incident.id} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
+              <li key={incident.id} className="flex flex-wrap items-center gap-2 px-4 py-2.5">
                 <AlertTriangle className="size-4 shrink-0 text-amber-400" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-mono text-sm text-foreground">{incident.file_name}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="text-[11px] text-muted-foreground">
                     {new Date(incident.blocked_at).toLocaleString()}
                     {" · "}
                     {incident.threat_score === null ? "Risk score unavailable" : `Risk score ${incident.threat_score}/100`}
                   </p>
                 </div>
-                <span className="rounded-full border border-border px-2.5 py-1 text-xs capitalize text-muted-foreground">
+                <span className="rounded-full border border-border px-2 py-0.5 text-[11px] capitalize text-muted-foreground">
                   {incident.status === "blocked" ? "quarantined" : "released"}
                 </span>
               </li>
             ))}
           </ul>
         )}
+        <p className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
+          Malicious files are quarantined automatically. Release requests require administrator approval.
+        </p>
       </section>
 
-      <p className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
-        Files detected as malicious are quarantined automatically. Only an administrator can approve a release request.
-      </p>
-
       <section className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
-        <div className="flex items-center gap-3 border-b border-border px-5 py-4">
-          <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Globe2 className="size-4" />
+        <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+          <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Globe2 className="size-3.5" />
           </span>
           <div>
             <h2 className="text-sm font-semibold text-foreground">Check a URL</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">Review a link’s reputation before you visit it.</p>
           </div>
         </div>
-        <div className="p-5">
-          <form onSubmit={submitUrl} className="flex flex-col gap-3 sm:flex-row">
+        <div className="p-4">
+          <form onSubmit={submitUrl} className="flex flex-col gap-2 sm:flex-row">
             <label htmlFor="dashboard-url-check" className="sr-only">URL to check</label>
             <input
               id="dashboard-url-check"
@@ -398,14 +385,14 @@ export function UserDashboard({ userId }: { userId: string }) {
               }}
               placeholder="https://example.com"
               disabled={urlBusy}
-              className="h-10 min-w-0 flex-1 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60"
+              className="h-9 min-w-0 flex-1 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60"
             />
             <Button type="submit" disabled={urlBusy || !url.trim()} className="gap-2">
               {urlBusy ? <LoaderCircle className="size-4 animate-spin" /> : <Search className="size-4" />}
               Check URL
             </Button>
           </form>
-          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+          <p className="mt-2 text-[11px] leading-4 text-muted-foreground">
             URL query strings and fragments are removed before checking. If no report exists, the URL is sent to VirusTotal to request a scan. A clean result does not guarantee a site is safe.
           </p>
 
@@ -486,6 +473,7 @@ export function UserDashboard({ userId }: { userId: string }) {
           )}
         </div>
       </section>
+      </div>
     </div>
   )
 }

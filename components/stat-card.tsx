@@ -16,23 +16,25 @@ export function StatCard({
   icon: Icon,
   tone = "primary",
   hint,
+  compact = false,
 }: {
   label: string
   value: string
   icon: LucideIcon
   tone?: Tone
   hint?: string
+  compact?: boolean
 }) {
   return (
-    <div className="group rounded-2xl border border-border/80 bg-card p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-md">
-      <div className="flex items-start justify-between gap-3">
+    <div className={`group rounded-2xl border border-border/80 bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-md ${compact ? "p-3" : "p-5"}`}>
+      <div className={`flex justify-between gap-3 ${compact ? "items-center" : "items-start"}`}>
         <div className="min-w-0">
-          <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="mt-2 font-mono text-3xl font-semibold tabular-nums tracking-tight text-foreground">{value}</p>
-          {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
+          <p className={compact ? "text-xs text-muted-foreground" : "text-sm text-muted-foreground"}>{label}</p>
+          <p className={`font-mono font-semibold tabular-nums tracking-tight text-foreground ${compact ? "mt-0.5 text-2xl" : "mt-2 text-3xl"}`}>{value}</p>
+          {hint && <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>}
         </div>
-        <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-lg border", toneMap[tone])}>
-          <Icon className="size-5" />
+        <span className={cn("flex shrink-0 items-center justify-center rounded-lg border", compact ? "size-8" : "size-10", toneMap[tone])}>
+          <Icon className={compact ? "size-4" : "size-5"} />
         </span>
       </div>
     </div>

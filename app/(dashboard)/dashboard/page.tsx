@@ -27,6 +27,7 @@ function DailyActivityChart({
   itemLabel,
   singularItemLabel,
   emptyMessage,
+  error,
   showTotal = true,
 }: {
   days: DailyActivityDay[]
@@ -35,14 +36,15 @@ function DailyActivityChart({
   itemLabel: string
   singularItemLabel: string
   emptyMessage: string
+  error?: string | null
   showTotal?: boolean
 }) {
   const chartWidth = 760
-  const chartHeight = 220
+  const chartHeight = 170
   const plotLeft = 42
-  const plotTop = 20
+  const plotTop = 12
   const plotWidth = 700
-  const plotHeight = 145
+  const plotHeight = 105
   const maxCount = Math.max(1, ...days.map((day) => day.count))
   const total = days.reduce((sum, day) => sum + day.count, 0)
   const step = plotWidth / days.length
@@ -52,7 +54,7 @@ function DailyActivityChart({
 
   return (
     <section className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
         <div>
           <h2 className="text-sm font-semibold text-foreground">{title}</h2>
           <p className="mt-1 text-xs text-muted-foreground">{description}</p>
@@ -64,15 +66,19 @@ function DailyActivityChart({
           </p>
         )}
       </div>
-      <div className="px-3 py-4 sm:px-5">
-        {total === 0 ? (
-          <p className="py-16 text-center text-sm text-muted-foreground">{emptyMessage}</p>
+      <div className="px-3 py-2">
+        {error ? (
+          <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {error}
+          </p>
+        ) : total === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">{emptyMessage}</p>
         ) : (
           <svg
             viewBox={`0 0 ${chartWidth} ${chartHeight}`}
             role="img"
             aria-label={`${title}, daily counts over the last 30 days. ${days.filter((day) => day.count > 0).length} days had activity.`}
-            className="h-auto w-full overflow-visible"
+            className="h-auto max-h-40 w-full overflow-visible"
           >
             {tickValues.map((value) => {
               const y = plotTop + plotHeight - (value / maxCount) * plotHeight
@@ -114,7 +120,7 @@ function DailyActivityChart({
                   {labelIndexes.includes(index) && (
                     <text
                       x={x + barWidth / 2}
-                      y={plotTop + plotHeight + 20}
+                      y={plotTop + plotHeight + 18}
                       textAnchor="middle"
                       className="fill-muted-foreground text-[10px]"
                     >
@@ -126,7 +132,7 @@ function DailyActivityChart({
             })}
           </svg>
         )}
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className="mt-1 text-[11px] text-muted-foreground">
           Each bar shows the number of {itemLabel} recorded on that date.
         </p>
       </div>
@@ -139,6 +145,7 @@ function DashboardOverview() {
   const [activeUsersCount, setActiveUsersCount] = useState<string>("—")
   const [quarantineActivity, setQuarantineActivity] = useState<DailyActivityDay[]>([])
   const [urlReputationActivity, setUrlReputationActivity] = useState<DailyActivityDay[]>([])
+  const [urlReputationError, setUrlReputationError] = useState<string | null>(null)
   const [pendingCount, setPendingCount] = useState(0)
   const [alerts, setAlerts] = useState<RequestAlert[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -151,7 +158,7 @@ function DashboardOverview() {
       const date = new Date(todayUtc - (29 - index) * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
       return { date, count: 0 }
     })
-    const [files, users, requests, incidents, urlActivity] = await Promise.all([
+    const [files, users, requests, incidents] = await Promise.all([
       supabase.from("block_incidents").select("id", { count: "exact", head: true }).eq("status", "blocked"),
       supabase
         .from("profiles")
@@ -170,10 +177,9 @@ function DashboardOverview() {
         .select("blocked_at")
         .gte("blocked_at", `${activityDays[0].date}T00:00:00.000Z`)
         .order("blocked_at", { ascending: true }),
-      supabase.rpc("get_url_reputation_daily_users"),
     ])
 
-    const failed = [files.error, users.error, requests.error, incidents.error, urlActivity.error].find(Boolean)
+    const failed = [files.error, users.error, requests.error, incidents.error].find(Boolean)
     if (failed) {
       setError(failed.message)
       return
@@ -186,13 +192,6 @@ function DashboardOverview() {
       if (count !== undefined) countsByDate.set(date, count + 1)
     }
     setQuarantineActivity(activityDays.map((day) => ({ ...day, count: countsByDate.get(day.date) ?? 0 })))
-    const urlActivityRows: { activity_date: string; user_count: number }[] = urlActivity.data ?? []
-    setUrlReputationActivity(
-      urlActivityRows.map(({ activity_date, user_count }) => ({
-        date: activity_date,
-        count: Number(user_count),
-      })),
-    )
 
     const pendingRequests = requests.data ?? []
     let enrichedRequests: RequestAlert[] = pendingRequests
@@ -222,6 +221,24 @@ function DashboardOverview() {
     setActiveUsersCount(String(users.count ?? 0))
     setPendingCount(requests.count ?? 0)
     setAlerts(enrichedRequests)
+
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) throw new Error(sessionError.message)
+      if (!session?.access_token) throw new Error("Sign in again to load URL reputation activity.")
+
+      const response = await fetch("/api/admin/url-reputation-activity", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        cache: "no-store",
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || `Unable to load URL activity (HTTP ${response.status}).`)
+
+      setUrlReputationActivity(result as DailyActivityDay[])
+      setUrlReputationError(null)
+    } catch (cause) {
+      setUrlReputationError(cause instanceof Error ? cause.message : "Unable to load URL reputation activity.")
+    }
   }, [])
 
   useEffect(() => {
@@ -255,16 +272,16 @@ function DashboardOverview() {
   }, [loadDashboard])
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6">
-      <div className="relative overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/10 via-card to-card px-6 py-7 shadow-sm md:px-8 md:py-8">
+    <div className="mx-auto flex max-w-6xl flex-col gap-3">
+      <div className="relative overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/10 via-card to-card px-5 py-4 shadow-sm md:px-6">
         <div className="relative z-10 flex flex-wrap items-start justify-between gap-5">
           <div>
-            <span className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/70 px-3 py-1 text-xs font-medium text-primary">
+            <span className="mb-2 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/70 px-2.5 py-1 text-[11px] font-medium text-primary">
               <ShieldCheck className="size-3.5" />
               Security overview
             </span>
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">Main Dashboard</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">Main Dashboard</h1>
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
               A clear view of quarantined files, active protection, and incoming user requests.
             </p>
           </div>
@@ -282,13 +299,14 @@ function DashboardOverview() {
         </p>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <StatCard
           label="Currently Quarantined Files"
           value={quarantinedCount}
           icon={LockKeyhole}
           tone="amber"
           hint="Files currently in quarantine"
+          compact
         />
         <StatCard
           label="Active Extension Users"
@@ -296,30 +314,34 @@ function DashboardOverview() {
           icon={Users}
           tone="primary"
           hint="Active in the last 5 minutes"
+          compact
         />
       </div>
 
-      <DailyActivityChart
-        days={quarantineActivity}
-        title="Quarantine Activity"
-        description="Files quarantined per day over the last 30 days"
-        itemLabel="files quarantined"
-        singularItemLabel="file quarantined"
-        emptyMessage="No quarantined files recorded in the last 30 days."
-      />
+      <div className="grid gap-3 xl:grid-cols-2">
+        <DailyActivityChart
+          days={quarantineActivity}
+          title="Quarantine Activity"
+          description="Files quarantined per day over the last 30 days"
+          itemLabel="files quarantined"
+          singularItemLabel="file quarantined"
+          emptyMessage="No quarantined files recorded in the last 30 days."
+        />
 
-      <DailyActivityChart
-        days={urlReputationActivity}
-        title="URL Reputation Users"
-        description="Unique users who checked URLs per day over the last 30 days"
-        itemLabel="unique users"
-        singularItemLabel="unique user"
-        emptyMessage="No URL reputation checks recorded in the last 30 days."
-        showTotal={false}
-      />
+        <DailyActivityChart
+          days={urlReputationActivity}
+          title="URL Reputation Users"
+          description="Unique users who checked URLs per day over the last 30 days"
+          itemLabel="unique users"
+          singularItemLabel="unique user"
+          emptyMessage="No URL reputation checks recorded in the last 30 days."
+          error={urlReputationError}
+          showTotal={false}
+        />
+      </div>
 
       <section className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm">
-        <div className="flex items-center gap-2 border-b border-border px-5 py-4">
+        <div className="flex items-center gap-2 border-b border-border px-4 py-3">
           <BellRing className="size-4 text-primary" />
           <h2 className="text-sm font-semibold text-foreground">Unquarantine Request Alerts</h2>
           <span className="ml-auto rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
@@ -327,26 +349,26 @@ function DashboardOverview() {
           </span>
         </div>
         {alerts.length === 0 ? (
-          <p className="px-5 py-8 text-center text-sm text-muted-foreground">No pending user requests.</p>
+          <p className="px-5 py-5 text-center text-sm text-muted-foreground">No pending user requests.</p>
         ) : (
-          <ul className="divide-y divide-border">
+          <ul className="grid gap-2 p-3 sm:grid-cols-2">
             {alerts.map((alert) => (
-              <li key={alert.id} className="flex flex-wrap items-center gap-3 px-5 py-3.5">
+              <li key={alert.id} className="flex min-w-0 items-start gap-2 rounded-lg border border-border/70 px-3 py-2">
                 <Activity className="size-4 shrink-0 text-amber-400" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-mono text-sm text-foreground">
+                  <p className="truncate font-mono text-xs text-foreground">
                     {alert.file_name ?? `Incident ${alert.incident_id}`}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {alert.user_email ?? alert.user_id} · {new Date(alert.requested_at).toLocaleString()}
                   </p>
-                  <p className="mt-1 truncate text-xs text-muted-foreground">{alert.reason}</p>
+                  <p className="truncate text-[11px] text-muted-foreground">{alert.reason}</p>
                 </div>
               </li>
             ))}
           </ul>
         )}
-        <div className="border-t border-border px-5 py-3">
+        <div className="border-t border-border px-4 py-2">
           <Link href="/requests" className="text-sm font-medium text-primary hover:underline">
             Review requests
           </Link>
