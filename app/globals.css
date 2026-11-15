@@ -116,6 +116,17 @@
   --sidebar-ring: #10b981;
 }
 
+.dashboard-backdrop {
+  background-color: var(--background);
+  background-image:
+    radial-gradient(ellipse 42rem 30rem at 88% 4%, color-mix(in srgb, var(--primary) 11%, transparent), transparent 70%),
+    radial-gradient(ellipse 38rem 28rem at 12% 72%, color-mix(in srgb, #38bdf8 7%, transparent), transparent 70%),
+    linear-gradient(to right, color-mix(in srgb, var(--foreground) 2.5%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--foreground) 2.5%, transparent) 1px, transparent 1px);
+  background-size: auto, auto, 48px 48px, 48px 48px;
+  background-attachment: fixed;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
