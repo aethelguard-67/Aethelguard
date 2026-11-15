@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import { NextResponse } from "next/server"
 import { authenticateExtension } from "@/lib/supabase/extension-auth"
 import { createSupabaseServiceClient } from "@/lib/supabase/server"
@@ -40,6 +41,37 @@ type VirusTotalAnalysis = {
       stats?: VirusTotalStats
       results?: Record<string, VirusTotalEngineResult>
     }
+  }
+}
+
+type AuthenticatedSupabase = Extract<
+  Awaited<ReturnType<typeof authenticateExtension>>,
+  { supabase: unknown }
+>["supabase"]
+
+export const runtime = "nodejs"
+
+function hashUrl(url: string) {
+  return createHash("sha256").update(url).digest("hex")
+}
+
+async function recordUrlScan(
+  supabase: AuthenticatedSupabase,
+  urlHash: string,
+  reputation: string,
+  analysisId: string | null = null,
+): Promise<string | null> {
+  if (reputation === "unknown") return null
+
+  try {
+    const { error } = await supabase.rpc("record_url_reputation_scan", {
+      p_url_hash: urlHash,
+      p_reputation: reputation,
+      p_analysis_id: analysisId,
+    })
+    return error?.message ?? null
+  } catch (cause) {
+    return cause instanceof Error ? cause.message : "Unable to contact the Supabase database."
   }
 }
 
@@ -127,8 +159,9 @@ function reputationResult(stats: VirusTotalStats) {
   const malicious = stats.malicious ?? 0
   const suspicious = stats.suspicious ?? 0
   const totalEngines = values.reduce((sum, value) => sum + (value ?? 0), 0)
+  const cleanResults = (stats.harmless ?? 0) + (stats.undetected ?? 0)
   const reputation =
-    malicious > 0 ? "malicious" : suspicious > 0 ? "suspicious" : totalEngines > 0 ? "clean" : "unknown"
+    malicious > 0 ? "malicious" : suspicious > 0 ? "suspicious" : cleanResults > 0 ? "clean" : "unknown"
 
   return {
     reputation,
@@ -186,6 +219,25 @@ async function handleRequest(request: Request, submitIfMissing: boolean) {
     const result = attributes?.stats && reputationResult(attributes.stats)
     if (!result) {
       return NextResponse.json({ error: "VirusTotal returned invalid analysis statistics." }, { status: 502 })
+    }
+    const { data: previousScan, error: previousScanError } = await auth.supabase
+      .from("url_reputation_scan_results")
+      .select("url_hash")
+      .eq("analysis_id", analysisId)
+      .maybeSingle()
+    if (previousScanError) {
+      return NextResponse.json(
+        { error: `Unable to load URL scan tracking. Apply migration 202611150001_url_reputation_scan_results.sql. ${previousScanError.message}` },
+        { status: 503 },
+      )
+    }
+    const urlHash = previousScan?.url_hash ?? createHash("sha256").update(`analysis:${analysisId}`).digest("hex")
+    const scanRecordError = await recordUrlScan(auth.supabase, urlHash, result.reputation, analysisId)
+    if (scanRecordError) {
+      return NextResponse.json(
+        { error: `Unable to record URL scan results. Apply migration 202611150001_url_reputation_scan_results.sql. ${scanRecordError}` },
+        { status: 503 },
+      )
     }
     return NextResponse.json({
       scanStatus: status,
@@ -250,6 +302,13 @@ async function handleRequest(request: Request, submitIfMissing: boolean) {
     if (!result) {
       return NextResponse.json({ error: "VirusTotal returned an incomplete or invalid URL report." }, { status: 502 })
     }
+    const scanRecordError = await recordUrlScan(auth.supabase, hashUrl(submittedUrl), result.reputation)
+    if (scanRecordError) {
+      return NextResponse.json(
+        { error: `Unable to record URL scan results. Apply migration 202611150001_url_reputation_scan_results.sql. ${scanRecordError}` },
+        { status: 503 },
+      )
+    }
     return NextResponse.json({ ...result, scanStatus: "completed" })
   }
 
@@ -283,6 +342,19 @@ async function handleRequest(request: Request, submitIfMissing: boolean) {
 
   if (!analysis.data?.id) {
     return NextResponse.json({ error: "VirusTotal did not return an analysis ID." }, { status: 502 })
+  }
+
+  const pendingRecordError = await recordUrlScan(
+    auth.supabase,
+    hashUrl(submittedUrl),
+    "pending",
+    analysis.data.id,
+  )
+  if (pendingRecordError) {
+    return NextResponse.json(
+      { error: `Unable to record URL scan results. Apply migration 202611150001_url_reputation_scan_results.sql. ${pendingRecordError}` },
+      { status: 503 },
+    )
   }
 
   return NextResponse.json(

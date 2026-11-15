@@ -52,16 +52,117 @@ type UrlCheckResult = {
   threatDetails?: string[]
 }
 
+type UrlScanCounts = {
+  safe: number
+  suspicious: number
+  malicious: number
+}
+
+const emptyUrlScanCounts: UrlScanCounts = { safe: 0, suspicious: 0, malicious: 0 }
+
+function UrlScanBreakdown({
+  counts,
+  error,
+  loading,
+}: {
+  counts: UrlScanCounts
+  error: string | null
+  loading: boolean
+}) {
+  const total = counts.safe + counts.suspicious + counts.malicious
+  const circumference = 2 * Math.PI * 34
+  const segments = [
+    { key: "safe", label: "Safe", color: "#22c55e", count: counts.safe },
+    { key: "suspicious", label: "Suspicious", color: "#eab308", count: counts.suspicious },
+    { key: "malicious", label: "Malicious", color: "#ef4444", count: counts.malicious },
+  ]
+  let offset = 0
+
+  return (
+    <section className="flex flex-col rounded-2xl border border-border/80 bg-card p-3 shadow-sm">
+      <h2 className="text-xs font-semibold text-foreground">Scanned Website Safety</h2>
+      {error ? (
+        <p role="alert" className="mt-2 rounded-lg border border-destructive/30 bg-destructive/10 px-2 py-1.5 text-[11px] text-destructive">
+          {error}
+        </p>
+      ) : loading ? (
+        <p className="my-auto py-5 text-center text-xs text-muted-foreground">Loading scan results…</p>
+      ) : (
+        <>
+          <div className="flex flex-1 items-center justify-center py-1">
+            <svg
+              viewBox="0 0 80 80"
+              role="img"
+              aria-label={`URL scan breakdown: ${segments.map(({ label, count }) => `${label} ${total ? Math.round((count / total) * 100) : 0}%`).join(", ")}`}
+              className="size-24"
+            >
+              <circle cx="40" cy="40" r="34" fill="none" stroke="currentColor" strokeWidth="12" className="text-muted" />
+              {segments.map((segment) => {
+                const length = total ? (segment.count / total) * circumference : 0
+                const segmentOffset = offset
+                offset += length
+                const percentage = total ? (segment.count / total) * 100 : 0
+                return (
+                  <circle
+                    key={segment.key}
+                    cx="40"
+                    cy="40"
+                    r="34"
+                    fill="none"
+                    stroke={segment.color}
+                    strokeWidth="12"
+                    strokeDasharray={`${length} ${circumference - length}`}
+                    strokeDashoffset={-segmentOffset}
+                    transform="rotate(-90 40 40)"
+                    className="transition-opacity hover:opacity-75"
+                  >
+                    <title>{`${segment.label}: ${percentage.toFixed(1)}% (${segment.count} ${segment.count === 1 ? "URL" : "URLs"})`}</title>
+                  </circle>
+                )
+              })}
+            </svg>
+          </div>
+          <div className="grid grid-cols-3 gap-1 border-t border-border pt-2 text-center">
+            {segments.map((segment) => {
+              const percentage = total ? (segment.count / total) * 100 : 0
+              return (
+                <div key={segment.key} title={`${segment.label}: ${percentage.toFixed(1)}% of ${total} unique URLs`}>
+                  <p className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground">
+                    <span className="size-1.5 rounded-full" style={{ backgroundColor: segment.color }} />
+                    {segment.label}
+                  </p>
+                  <p className="text-xs font-semibold tabular-nums text-foreground">
+                    {Math.round(percentage)}% <span className="font-normal text-muted-foreground">({segment.count})</span>
+                  </p>
+                </div>
+              )
+            })}
+          </div>
+          <p className="mt-1 text-center text-[10px] text-muted-foreground">
+            {total} unique completed URLs · unrated excluded · tracking starts after migration
+          </p>
+          <p className="text-center text-[10px] text-muted-foreground">
+            Green = safe · Yellow = suspicious · Red = malicious. Clean results are not a safety guarantee.
+          </p>
+        </>
+      )}
+    </section>
+  )
+}
+
 function useUserIncidents(userId: string) {
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [requests, setRequests] = useState<Map<string, UserRequest>>(new Map())
   const [blockedCount, setBlockedCount] = useState(0)
   const [pendingCount, setPendingCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [urlScanCounts, setUrlScanCounts] = useState<UrlScanCounts>(emptyUrlScanCounts)
+  const [urlScanError, setUrlScanError] = useState<string | null>(null)
+  const [urlScanLoaded, setUrlScanLoaded] = useState(false)
 
   const load = useCallback(async () => {
     const supabase = createSupabaseBrowserClient()
-    const [incidentResult, pendingResult] = await Promise.all([
+    const [incidentResult, pendingResult, urlScanResult] = await Promise.all([
       supabase
         .from("block_incidents")
         .select("id, file_name, malicious_engines, total_engines, threat_score, threat_details, status, blocked_at", {
@@ -71,7 +172,23 @@ function useUserIncidents(userId: string) {
         .order("blocked_at", { ascending: false })
         .limit(100),
       supabase.from("unquarantine_requests").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("status", "pending"),
+      supabase.rpc("get_my_url_reputation_scan_counts"),
     ])
+    if (urlScanResult.error) {
+      setUrlScanError(
+        `Unable to load URL scan statistics. Apply migration 202611150001_url_reputation_scan_results.sql. ${urlScanResult.error.message}`,
+      )
+    } else {
+      const counts = urlScanResult.data?.[0]
+      setUrlScanCounts({
+        safe: Number(counts?.safe_count ?? 0),
+        suspicious: Number(counts?.suspicious_count ?? 0),
+        malicious: Number(counts?.malicious_count ?? 0),
+      })
+      setUrlScanError(null)
+    }
+    setUrlScanLoaded(true)
+
     const failed = [incidentResult.error, pendingResult.error].find(Boolean)
     if (failed) {
       setError(failed.message)
@@ -129,7 +246,18 @@ function useUserIncidents(userId: string) {
     }
   }, [load, userId])
 
-  return { incidents, requests, blockedCount, pendingCount, error, setError, reload: load }
+  return {
+    incidents,
+    requests,
+    blockedCount,
+    pendingCount,
+    error,
+    setError,
+    urlScanCounts,
+    urlScanError,
+    urlScanLoaded,
+    reload: load,
+  }
 }
 
 function incidentReason(incident: Incident) {
@@ -215,7 +343,16 @@ function ExtensionInstallNotice({ userId }: { userId: string }) {
 }
 
 export function UserDashboard({ userId }: { userId: string }) {
-  const { incidents, blockedCount, pendingCount, error } = useUserIncidents(userId)
+  const {
+    incidents,
+    blockedCount,
+    pendingCount,
+    error,
+    urlScanCounts,
+    urlScanError,
+    urlScanLoaded,
+    reload,
+  } = useUserIncidents(userId)
   const recentIncidents = incidents.slice(0, 5)
   const [url, setUrl] = useState("")
   const [urlError, setUrlError] = useState<string | null>(null)
@@ -285,6 +422,7 @@ export function UserDashboard({ userId }: { userId: string }) {
         })
       } else {
         setUrlResult(result)
+        if (result.reputation !== "unknown") await reload()
       }
     } catch (cause) {
       setUrlError(cause instanceof Error ? cause.message : "Unable to check this URL.")
@@ -318,9 +456,10 @@ export function UserDashboard({ userId }: { userId: string }) {
 
       {error && <ErrorNotice message={error} />}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard label="Files Quarantined" value={String(blockedCount)} icon={FileWarning} tone="destructive" hint="All recorded quarantine incidents" compact />
         <StatCard label="Pending Requests" value={String(pendingCount)} icon={Clock3} tone="sky" hint="Awaiting administrator review" compact />
+        <UrlScanBreakdown counts={urlScanCounts} error={urlScanError} loading={!urlScanLoaded} />
       </div>
 
       <div className="grid items-start gap-3 xl:grid-cols-2">
