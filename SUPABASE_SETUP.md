@@ -19,7 +19,9 @@ server-side file-hash and URL reputation lookups. No sample records are inserted
    [`202610270002_url_reputation_activity.sql`](./supabase/migrations/202610270002_url_reputation_activity.sql)
    adds the admin dashboard's daily unique URL reputation user counts. Apply
    [`202611150001_url_reputation_scan_results.sql`](./supabase/migrations/202611150001_url_reputation_scan_results.sql)
-   to enable users' unique URL safety breakdowns.
+   to enable users' unique URL safety breakdowns, and apply
+   [`202611150002_url_reputation_scan_realtime.sql`](./supabase/migrations/202611150002_url_reputation_scan_realtime.sql)
+   to publish scan-result changes for live dashboard updates.
 2. Copy `.env.example` to `.env.local`. Set `NEXT_PUBLIC_SUPABASE_URL` and
    `NEXT_PUBLIC_SUPABASE_ANON_KEY` from the project API settings. Set
    `SUPABASE_SERVICE_ROLE_KEY` from the project API settings and

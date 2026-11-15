@@ -63,10 +63,12 @@ const emptyUrlScanCounts: UrlScanCounts = { safe: 0, suspicious: 0, malicious: 0
 function UrlScanBreakdown({
   counts,
   error,
+  liveUpdateError,
   loading,
 }: {
   counts: UrlScanCounts
   error: string | null
+  liveUpdateError: string | null
   loading: boolean
 }) {
   const total = counts.safe + counts.suspicious + counts.malicious
@@ -138,12 +140,11 @@ function UrlScanBreakdown({
               )
             })}
           </div>
-          <p className="mt-1 text-center text-[10px] text-muted-foreground">
-            {total} unique completed URLs · unrated excluded · tracking starts after migration
-          </p>
-          <p className="text-center text-[10px] text-muted-foreground">
-            Green = safe · Yellow = suspicious · Red = malicious. Clean results are not a safety guarantee.
-          </p>
+          {liveUpdateError && (
+            <p role="status" className="mt-1 text-center text-[10px] text-amber-600 dark:text-amber-400">
+              {liveUpdateError}
+            </p>
+          )}
         </>
       )}
     </section>
@@ -158,6 +159,7 @@ function useUserIncidents(userId: string) {
   const [error, setError] = useState<string | null>(null)
   const [urlScanCounts, setUrlScanCounts] = useState<UrlScanCounts>(emptyUrlScanCounts)
   const [urlScanError, setUrlScanError] = useState<string | null>(null)
+  const [urlScanRealtimeError, setUrlScanRealtimeError] = useState<string | null>(null)
   const [urlScanLoaded, setUrlScanLoaded] = useState(false)
 
   const load = useCallback(async () => {
@@ -233,9 +235,18 @@ function useUserIncidents(userId: string) {
         { event: "*", schema: "public", table: "unquarantine_requests", filter: `user_id=eq.${userId}` },
         () => void load(),
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "url_reputation_scan_results", filter: `user_id=eq.${userId}` },
+        () => void load(),
+      )
       .subscribe((status, subscriptionError) => {
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          setError(`Live quarantine updates are unavailable: ${subscriptionError?.message ?? status}.`)
+          const message = subscriptionError?.message ?? status
+          setError(`Live dashboard updates are unavailable: ${message}.`)
+          setUrlScanRealtimeError(`Live URL safety updates are unavailable: ${message}.`)
+        } else if (status === "SUBSCRIBED") {
+          setUrlScanRealtimeError(null)
         }
       })
     const timer = window.setInterval(() => void load(), 60_000)
@@ -255,6 +266,7 @@ function useUserIncidents(userId: string) {
     setError,
     urlScanCounts,
     urlScanError,
+    urlScanRealtimeError,
     urlScanLoaded,
     reload: load,
   }
@@ -350,6 +362,7 @@ export function UserDashboard({ userId }: { userId: string }) {
     error,
     urlScanCounts,
     urlScanError,
+    urlScanRealtimeError,
     urlScanLoaded,
     reload,
   } = useUserIncidents(userId)
@@ -459,7 +472,12 @@ export function UserDashboard({ userId }: { userId: string }) {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard label="Files Quarantined" value={String(blockedCount)} icon={FileWarning} tone="destructive" hint="All recorded quarantine incidents" compact />
         <StatCard label="Pending Requests" value={String(pendingCount)} icon={Clock3} tone="sky" hint="Awaiting administrator review" compact />
-        <UrlScanBreakdown counts={urlScanCounts} error={urlScanError} loading={!urlScanLoaded} />
+        <UrlScanBreakdown
+          counts={urlScanCounts}
+          error={urlScanError}
+          liveUpdateError={urlScanRealtimeError}
+          loading={!urlScanLoaded}
+        />
       </div>
 
       <div className="grid items-start gap-3 xl:grid-cols-2">
