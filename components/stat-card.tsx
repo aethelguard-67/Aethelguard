@@ -26,15 +26,15 @@ export function StatCard({
   compact?: boolean
 }) {
   return (
-    <div className={`group rounded-2xl border border-border/80 bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-md ${compact ? "p-3" : "p-5"}`}>
-      <div className={`flex justify-between gap-3 ${compact ? "items-center" : "items-start"}`}>
+    <div className={`group rounded-2xl border border-border/80 bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-md ${compact ? "flex h-full min-h-36 items-center p-5" : "p-5"}`}>
+      <div className={`flex w-full justify-between gap-3 ${compact ? "items-center" : "items-start"}`}>
         <div className="min-w-0">
-          <p className={compact ? "text-xs text-muted-foreground" : "text-sm text-muted-foreground"}>{label}</p>
-          <p className={`font-mono font-semibold tabular-nums tracking-tight text-foreground ${compact ? "mt-0.5 text-2xl" : "mt-2 text-3xl"}`}>{value}</p>
-          {hint && <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>}
+          <p className="text-sm text-muted-foreground">{label}</p>
+          <p className={`font-mono font-semibold tabular-nums tracking-tight text-foreground ${compact ? "mt-1 text-4xl" : "mt-2 text-3xl"}`}>{value}</p>
+          {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
         </div>
-        <span className={cn("flex shrink-0 items-center justify-center rounded-lg border", compact ? "size-8" : "size-10", toneMap[tone])}>
-          <Icon className={compact ? "size-4" : "size-5"} />
+        <span className={cn("flex shrink-0 items-center justify-center rounded-lg border", compact ? "size-12" : "size-10", toneMap[tone])}>
+          <Icon className={compact ? "size-6" : "size-5"} />
         </span>
       </div>
     </div>
